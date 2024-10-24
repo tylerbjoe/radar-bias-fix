@@ -22,8 +22,8 @@ for i in range(6):
         tmp_b.append(df["frame_data"][j][i])
     bins.append(tmp_b)
 
-x_axis = df["frame_times"]
-x_axis = np.array(x_axis - (min(x_axis)))
+# x_axis = df["frame_times"]
+# x_axis = np.array(x_axis - (min(x_axis)))
 
 # fig, axes = plt.subplots(3, 1, figsize=(15, 8))
 # bin_plots = [0]*6
@@ -40,7 +40,7 @@ x_axis = np.array(x_axis - (min(x_axis)))
 
 
 # windowing function takes array and returns array of arrays containing windows
-def get_windows(signal, window_len=5, overlap=0, fz=30):
+def get_windows(signal, window_len=10, overlap=0, fz=30):
     windows = []
     win_dur = int(window_len * fz)
     win_diff = int(window_len-overlap * fz)
@@ -66,7 +66,8 @@ def get_linear(signal):
 # script to run
 fs = 18
 
-sig = integrate.cumulative_trapezoid(bins[2])
+biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
+sig = integrate.cumulative_trapezoid(biny)
 windows = get_windows(sig)
 window=[]
 lin=[]
