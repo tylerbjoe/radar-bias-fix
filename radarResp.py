@@ -9,24 +9,27 @@ import matplotlib.pyplot as plt
 class Radar_Resp():
     '''' Begin Class '''
     def __init__(self):
-        self.window = []
-        self.fs = 30
-        self.win_size = 12 * self.fs
-        self.check_corr = 8 * self.fs
-        self.running = False
-        self.lin_model=[]
-        self.sub_point=0
-        self.correlation = 0
-        self.sample_n = 0
-        self.slope=0
-        self.intercept=0
-        self.floater = 0
+        self.fs = 30                    # frequency (Hz)
+        self.window = []                # empty window
+        self.win_size = 10 * self.fs     # window size (s)
+        self.check_corr = 3 * self.fs   # rate to check if model still correlates to signal (s)
+        self.running = False            # whether or not running
+        self.lin_model = []             # empty linear model
+        self.sub_point = 0              # signal point with model subtracted
+        self.linear_point = 0
+        self.correlation = 0            # correlation metric (pearsonr)
+        self.sample_n = 0               # number of samples processed
+        self.slope = 0                  # slope of model
+        self.intercept = 0              # intercept of model
+        self.lasty = 0
+        self.streak = 0
 
     def get_sub_point(self):
         return self.sub_point
     
     def set_sub_point(self):
-            self.sub_point =  self.window[-1] - self.get_linear_point()
+        self.set_linear_point()
+        self.sub_point =  self.window[-1] - self.linear_point
 
     def set_correlation(self):
         self.correlation,_ = pearsonr(self.window, (self.lin_model))
@@ -39,26 +42,33 @@ class Radar_Resp():
         if len(self.window) >= self.win_size:
             self.window.pop(0)
         self.window.append(value)
-        
-        # Update linear model and correlation as new data is added
         if len(self.window) == self.win_size:
             if self.sample_n != self.win_size:
                 self.set_correlation()
-            if self.sample_n % self.check_corr == 0 and self.correlation<=0.2:
-                # self.floater=self.get_linear_point()
-                self.set_linear()
+            if (self.sample_n % self.check_corr == 0 and self.correlation<=0.7) or (self.win_size == self.sample_n):
+                self.set_linear() # make new model if correlation too off and every x seconds
+                self.streak = 0
+            self.streak+=1
             self.set_sub_point()
         
     def set_linear(self):
         dur = len(self.window)
         x = np.linspace(0, dur/30, dur)
-        self.slope, self.intercept, r, p, std_err = stats.linregress(x, self.window)
-        # self.lin_model = self.slope * x + self.floater
+        self.intercept = self.linear_point
+        self.slope, intercept, r, p, std_err = stats.linregress(x, self.window)
+        if self.intercept == 0:
+            self.intercept = intercept
         self.lin_model = self.slope * x + self.intercept
         
+    def set_linear_point(self):
+        if self.sample_n == self.win_size:
+            self.linear_point = self.slope * (self.sample_n / self.fs) + self.intercept
+            self.intercept = self.linear_point
+        else:
+            self.linear_point = self.slope * (self.streak / self.fs) + self.intercept
+        
     def get_linear_point(self):
-        # return self.slope * (self.sample_n / self.fs) + self.floater
-        return self.slope * (self.sample_n / self.fs) + self.intercept
+        return self.linear_point
     
     def start(self):
         self.running = True
@@ -81,7 +91,7 @@ class Radar_Resp():
 # Try on existing data
 import json
 import pandas as pd
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\test_npy_10_15 1\test_npy_10_15\Hunter\Hunter4\Radar_1_metadata_1729021313.5671923.json", 'r') as file:
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\test_npy_10_15 1\test_npy_10_15\Eric\Eric4\Radar_1_metadata_1729016880.666779.json", 'r') as file:
     json_data = json.load(file)
 bins = []
 df = pd.DataFrame(json_data)
