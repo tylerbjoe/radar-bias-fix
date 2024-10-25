@@ -1,35 +1,41 @@
 import time
 import numpy as np
-from scipy import integrate, stats
+from scipy import integrate
+from scipy import stats
 from scipy.stats import pearsonr
 from threading import Thread
 import matplotlib.pyplot as plt
-from queue import Queue
 
 class Radar_Resp():
     '''' Begin Class '''
     def __init__(self):
-        self.window = []
-        self.fs = 30
-        self.win_size = 7 * self.fs
-        self.check_corr = 7 * self.fs
-        self.running = False
-        self.lin_model = []
-        self.sub_point = 0
-        self.correlation = 0
-        self.sample_n = 0
-        self.slope = 0
-        self.intercept = 0
-        self.last_lin_model = []  # New variable to track last linear model
+        self.fs = 30                    # frequency (Hz)
+        
+        self.win_size = 3.5 * self.fs     # window size (s)
+        self.check_corr = .3 * self.fs   # rate to check if model still correlates to signal (s)
+        self.corr_threshold = 0.7
+        self.window = []                # empty window
+        
+        self.running = False            # whether or not running
+        self.lin_model = []             # empty linear model
+        self.sub_point = 0              # signal point with model subtracted
+        self.linear_point = 0
+        self.correlation = 0            # correlation metric (pearsonr)
+        self.sample_n = 0               # number of samples processed
+        self.slope = 0                  # slope of model
+        self.intercept = 0              # intercept of model
+        self.lasty = 0
+        self.streak = 0
 
     def get_sub_point(self):
         return self.sub_point
     
     def set_sub_point(self):
-        self.sub_point = self.window[-1] - self.get_linear_point()
+        self.set_linear_point()
+        self.sub_point =  self.window[-1] - self.linear_point
 
     def set_correlation(self):
-        self.correlation, _ = pearsonr(self.window, self.lin_model)
+        self.correlation,_ = pearsonr(self.window, (self.lin_model))
         
     def get_correlation(self):
         return self.correlation
@@ -39,34 +45,34 @@ class Radar_Resp():
         if len(self.window) >= self.win_size:
             self.window.pop(0)
         self.window.append(value)
-        
-        # Update linear model and correlation as new data is added
         if len(self.window) == self.win_size:
             if self.sample_n != self.win_size:
                 self.set_correlation()
-            if self.sample_n % self.check_corr == 0 and self.correlation <= 0.2:
-                self.set_linear()
+            if (self.sample_n % self.check_corr == 0 and self.correlation<self.corr_threshold) or (self.win_size == self.sample_n):
+                self.set_linear() # make new model if correlation too off and every x seconds
+                self.streak = 0
+            self.streak+=1
             self.set_sub_point()
         
     def set_linear(self):
         dur = len(self.window)
-        x = np.linspace(0, dur / self.fs, dur)
-        
-        # If there's a previous linear model, use its last value to adjust the intercept
-        if self.last_lin_model:
-            last_point = self.last_lin_model[-1]
-            self.slope, _, r, p, std_err = stats.linregress(x, self.window)
-            # Adjust intercept to align with the last point of the previous model
-            self.intercept = last_point - self.slope * (dur / self.fs)
-        else:
-            self.slope, self.intercept, r, p, std_err = stats.linregress(x, self.window)
-
+        x = np.linspace(0, dur/30, dur)
+        self.intercept = self.linear_point
+        self.slope, intercept, r, p, std_err = stats.linregress(x, self.window)
+        if self.intercept == 0:
+            self.intercept = intercept
         self.lin_model = self.slope * x + self.intercept
-        self.last_lin_model = self.lin_model.copy()  # Update last linear model
-
+        
+    def set_linear_point(self):
+        if self.sample_n == self.win_size:
+            self.linear_point = self.slope * (self.sample_n / self.fs) + self.intercept
+            self.intercept = self.linear_point
+        else:
+            self.linear_point = self.slope * (self.streak / self.fs) + self.intercept
+        
     def get_linear_point(self):
-        return self.slope * (self.sample_n / self.fs) + self.intercept
-
+        return self.linear_point
+    
     def start(self):
         self.running = True
         Thread(target=self._run, daemon=True).start()
@@ -75,18 +81,20 @@ class Radar_Resp():
         try:
             while self.running:
                 print(f"{self.sub_point} Linear subtracted point")
-                time.sleep(1 / 3000)
+                time.sleep(1/3000)
         except:
-            self.running = False
+            self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
 
     def stop(self):
         self.running = False
     '''' End Class '''
 
+
+
 # Try on existing data
 import json
 import pandas as pd
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\test_npy_10_15 1\test_npy_10_15\Hunter\Hunter4\Radar_1_metadata_1729021313.5671923.json", 'r') as file:
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\hypervent\Radar_1_metadata_1729625869.7712228.json", 'r') as file:
     json_data = json.load(file)
 bins = []
 df = pd.DataFrame(json_data)
