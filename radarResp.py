@@ -10,9 +10,12 @@ class Radar_Resp():
     '''' Begin Class '''
     def __init__(self):
         self.fs = 30                    # frequency (Hz)
+        
+        self.win_size = 3.5 * self.fs     # window size (s)
+        self.check_corr = .3 * self.fs   # rate to check if model still correlates to signal (s)
+        self.corr_threshold = 0.7
         self.window = []                # empty window
-        self.win_size = 10 * self.fs     # window size (s)
-        self.check_corr = 3 * self.fs   # rate to check if model still correlates to signal (s)
+        
         self.running = False            # whether or not running
         self.lin_model = []             # empty linear model
         self.sub_point = 0              # signal point with model subtracted
@@ -45,7 +48,7 @@ class Radar_Resp():
         if len(self.window) == self.win_size:
             if self.sample_n != self.win_size:
                 self.set_correlation()
-            if (self.sample_n % self.check_corr == 0 and self.correlation<=0.7) or (self.win_size == self.sample_n):
+            if (self.sample_n % self.check_corr == 0 and self.correlation<self.corr_threshold) or (self.win_size == self.sample_n):
                 self.set_linear() # make new model if correlation too off and every x seconds
                 self.streak = 0
             self.streak+=1
@@ -91,7 +94,7 @@ class Radar_Resp():
 # Try on existing data
 import json
 import pandas as pd
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\test_npy_10_15 1\test_npy_10_15\Eric\Eric4\Radar_1_metadata_1729016880.666779.json", 'r') as file:
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\hypervent\Radar_1_metadata_1729625869.7712228.json", 'r') as file:
     json_data = json.load(file)
 bins = []
 df = pd.DataFrame(json_data)
