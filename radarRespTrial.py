@@ -5,15 +5,16 @@ from scipy import stats
 from scipy.stats import pearsonr
 from threading import Thread
 import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
 
 class Radar_Resp():
     '''' Begin Class '''
     def __init__(self):
         self.fs = 30                    # frequency (Hz)
         
-        self.win_size = 3.5 * self.fs     # window size (s)
-        self.check_corr = .3 * self.fs   # rate to check if model still correlates to signal (s)
-        self.corr_threshold = 0.7
+        self.win_size = 12 * self.fs     # window size (s)
+        self.check_corr = 0.3 * self.fs   # rate to check if model still correlates to signal (s)
+        self.corr_threshold = 0.7       # correlation threshold to refresh model
         self.window = []                # empty window
         
         self.running = False            # whether or not running
@@ -27,7 +28,7 @@ class Radar_Resp():
         self.lasty = 0
         self.streak = 0
 
-    def get_sub_point(self):
+    def get_sub_point(self): # USE THIS TO GET A DETRENDED POINT BACK
         return self.sub_point
     
     def set_sub_point(self):
@@ -40,7 +41,7 @@ class Radar_Resp():
     def get_correlation(self):
         return self.correlation
     
-    def add_data(self, value):
+    def add_data(self, value): # USE THIS TO ADD A DATA POINT
         self.sample_n += 1
         if len(self.window) >= self.win_size:
             self.window.pop(0)
@@ -73,6 +74,15 @@ class Radar_Resp():
     def get_linear_point(self):
         return self.linear_point
     
+    def get_peakline(self):
+        last_peaks = find_peaks(self.window)[-2:]
+        x1 = last_peaks[0]
+        y1 = self.window[x1]
+        x2 = last_peaks[1]
+        y2 = self.window[x2]
+        self.slope = (y2-y1)/(x2-x1)
+        
+    
     def start(self):
         self.running = True
         Thread(target=self._run, daemon=True).start()
@@ -81,7 +91,7 @@ class Radar_Resp():
         try:
             while self.running:
                 print(f"{self.sub_point} Linear subtracted point")
-                time.sleep(1/3000)
+                time.sleep(1/30000)
         except:
             self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
 
@@ -91,21 +101,32 @@ class Radar_Resp():
 
 
 
-# Try on existing data
+# %% Try on existing data
 import json
 import pandas as pd
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\hypervent\Radar_1_metadata_1729625869.7712228.json", 'r') as file:
-    json_data = json.load(file)
-bins = []
-df = pd.DataFrame(json_data)
-for i in range(6):
-    tmp_b, tmp_a = [], []
-    for j in range(1, len(df["frame_data"])):
-        tmp_b.append(df["frame_data"][j][i])
-    bins.append(tmp_b)
-biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
-sig = integrate.cumulative_trapezoid(biny)
 
+# %% For JOSNS
+# with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
+#     json_data = json.load(file)
+# bins = []
+# df = pd.DataFrame(json_data)
+# for i in range(6):
+#     tmp_b, tmp_a = [], []
+#     for j in range(1, len(df["frame_data"])):
+#         tmp_b.append(df["frame_data"][j][i])
+#     bins.append(tmp_b)
+# biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
+# sig = integrate.cumulative_trapezoid(biny)
+
+#%% csvs
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Pneumo.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+truth = [int(x) for x in sigs][:15000]
+
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Radar_2.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
+sig = [float(x) for x in sigs]
+#%%
 # Example usage:
 subtracted_sig = []
 lin_mod = []
@@ -126,7 +147,7 @@ try:
         subtracted_sig.append(rr.get_sub_point())
         lin_mod.append(rr.get_linear_point())
         corr.append(rr.get_correlation())
-        time.sleep(1/3000)  # Simulate real-time data feed
+        time.sleep(1/30000)  # Simulate real-time data feed
         i+=1
         
 except KeyboardInterrupt:
@@ -141,21 +162,23 @@ time_axis = np.arange(len(sig)) / 30  # Time in seconds
 fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
 
 # First subplot: Signal and Linear Model
-axes[0].plot(time_axis, sig, label='Signal', color='blue')
-axes[0].plot(time_axis, lin_mod, label="LMS Model", color='orange')
-axes[0].plot(time_axis, subtracted_sig, label="Signal Linear Subtracted", color='red')
+axes[0].plot(time_axis,sig, label='Signal', color='blue')#time_axis, 
+axes[0].plot(time_axis,lin_mod, label="LMS Model", color='orange')
+axes[0].plot(time_axis,subtracted_sig, label="Signal Linear Subtracted", color='red')
+# axes[0].plot(time_axis, truth, label='Truth', color='black')
 axes[0].set_ylabel('Displacement (unitless)')
 axes[0].legend()
 axes[0].grid()
-axes[0].set_title('Signal Analysis', fontsize=16)
+axes[0].set_title('Radar', fontsize=16)
+# #%%
+# # Second subplot: Correlation
+# # axes[1].plot(time_axis, corr, label='Correlation', color='green')
+# axes[1].plot(time_axis,truth, label='Pneum', color='black')
+# axes[1].set_xlabel('Time')
+# axes[1].set_ylabel('Displacement (unitless)')
+# axes[1].legend()
+# axes[1].grid()
+# axes[1].set_title('Pneum', fontsize=16)
 
-# Second subplot: Correlation
-axes[1].plot(time_axis, corr, label='Correlation', color='green')
-axes[1].set_xlabel('Time (s)')
-axes[1].set_ylabel('Linear Correlation')
-axes[1].legend()
-axes[1].grid()
-axes[1].set_title('Correlation Analysis', fontsize=16)
-
-plt.tight_layout()  # Adjust layout for better spacing
-plt.show()
+# plt.tight_layout()  # Adjust layout for better spacing
+# plt.show()

@@ -9,34 +9,10 @@ from matplotlib.widgets import Button, RadioButtons, CheckButtons
 from scipy import integrate
 from scipy import stats
 import numpy as np
+from scipy.signal import find_peaks
+from scipy.interpolate import interp1d
 
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\test_npy_10_15 1\test_npy_10_15\Hunter\Hunter4\Radar_1_metadata_1729021313.5671923.json", 'r') as file:
-    json_data = json.load(file)
 
-bins = []
-
-df = pd.DataFrame(json_data)
-for i in range(6):
-    tmp_b, tmp_a = [], []
-    for j in range(1, len(df["frame_data"])):
-        tmp_b.append(df["frame_data"][j][i])
-    bins.append(tmp_b)
-
-# x_axis = df["frame_times"]
-# x_axis = np.array(x_axis - (min(x_axis)))
-
-# fig, axes = plt.subplots(3, 1, figsize=(15, 8))
-# bin_plots = [0]*6
-# axes[0].grid()
-# axes[0].set_xlabel('Time(s)')
-# axes[0].set_ylabel('Velocity(unitless)')
-# axes[1].grid()
-# axes[1].set_xlabel('Time(s)')
-# axes[1].set_ylabel('Displacement(unitless)')
-# for i in range(6):
-#     bin_plots[i], = axes[0].plot(x_axis[:len(bins[i])], bins[i])
-#     bin_plots[i], = axes[1].plot(x_axis[:len(bins[i])-1], integrate.cumulative_trapezoid(bins[i]))
-# plt.show()
 
 
 # windowing function takes array and returns array of arrays containing windows
@@ -59,15 +35,44 @@ def get_linear(signal):
     slope, intercept, r, p, std_err = stats.linregress(x, signal)
     return slope * x + intercept
    
-   
-   
-   
-   
-# script to run
-fs = 18
+def get_peakline(signal):
+    last_peaks = find_peaks(signal, distance=2.5*30, prominence=1650)[0]
+    x1 = last_peaks[-2]
+    y1 = signal[x1]
+    x2 = last_peaks[-1]
+    y2 = signal[x2]
+    signal = (y2-y1)/(x2-x1)
+    return last_peaks
+
+#%% JSONS
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
+    json_data = json.load(file)
+
+bins = []
+
+df = pd.DataFrame(json_data)
+for i in range(6):
+    tmp_b, tmp_a = [], []
+    for j in range(1, len(df["frame_data"])):
+        tmp_b.append(df["frame_data"][j][i])
+    bins.append(tmp_b)
 
 biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
 sig = integrate.cumulative_trapezoid(biny)
+#%% CSVS
+# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Pneumo.csv"
+# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+# truth = [int(x) for x in sigs][:15000]
+
+# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Radar_2.csv"
+# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
+# sig = [float(x) for x in sigs]
+# sig = np.array(sig)
+
+# # script to run
+# fs = 18
+
+#%% WINDOWING
 windows = get_windows(sig)
 window=[]
 lin=[]
@@ -87,20 +92,60 @@ while i<len(window):
     subtracted.append(window[i]-lin[i])
     i+=1
 
+#%% SIGNAL PROCESSING
+peaks = get_peakline(-sig)
+time = np.array(time)
+sig = np.array(sig)
 
+negative_peak_values = sig[peaks]
+
+interpolator = interp1d(peaks, negative_peak_values, kind='linear', fill_value="extrapolate")
+interpolated_signal = interpolator(np.arange(len(sig)))#[peaks[0]:peaks[-1]])))
+
+#%% PLOTTING SINGLE
+fs=18
 plt.figure()
-plt.plot(time,window, label='signal')
-plt.plot(time,lin, label="lms model")
-plt.plot(time,subtracted, label="signal linear subtracted")
+# plt.plot(time,window, label='signal')
+# plt.plot(time,lin, label="lms model")
+# plt.plot(time,subtracted, label="signal linear subtracted")
+plt.plot(time,sig, label='Signal',color='blue')
+plt.scatter(time[peaks],sig[peaks], color='orange')
+plt.plot(time,interpolated_signal, label='Interpolated Negative Peaks', linestyle='--', color='orange')#[peaks[0]:peaks[-1]]
+plt.plot(time,sig-interpolated_signal, label='detrended signal', color='red')
 
 #plt.title('8 Second window', fontsize=fs)
 plt.ylabel('displacement', fontsize=fs)
 plt.xlabel('time (s)', fontsize=fs)
 plt.legend(fontsize=fs)
+plt.grid()
 plt.show()
    
-   
-   
+#%% SUBPLOTS W TRUTH
+# time_axis = time
+# # Create subplots
+# fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+
+# # First subplot: Signal and Linear Model
+# axes[0].plot(time_axis,sig, label='Signal', color='blue')#time_axis, 
+# axes[0].plot(time_axis[peaks[0]:peaks[-1]],interpolated_signal, label='Interpolated Negative Peaks', linestyle='--', color='orange')
+# axes[0].plot(time_axis[peaks[0]:peaks[-1]],sig[peaks[0]:peaks[-1]]-interpolated_signal, color='red')
+
+# axes[0].set_ylabel('Displacement (unitless)')
+# axes[0].legend()
+# axes[0].grid()
+# axes[0].set_title('Radar', fontsize=16)
+
+# # Second subplot: Correlation
+# # axes[1].plot(time_axis, corr, label='Correlation', color='green')
+# axes[1].plot(time_axis,truth, label='Pneum', color='black')
+# axes[1].set_xlabel('Time')
+# axes[1].set_ylabel('Displacement (unitless)')
+# axes[1].legend()
+# axes[1].grid()
+# axes[1].set_title('Pneum', fontsize=16)
+
+# plt.tight_layout()  # Adjust layout for better spacing
+# plt.show()
    
    
    

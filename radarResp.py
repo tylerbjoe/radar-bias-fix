@@ -13,7 +13,7 @@ class Radar_Resp():
         
         self.win_size = 12 * self.fs     # window size (s)
         self.check_corr = 0.3 * self.fs   # rate to check if model still correlates to signal (s)
-        self.corr_threshold = 0.7
+        self.corr_threshold = 0.7       # correlation threshold to refresh model
         self.window = []                # empty window
         
         self.running = False            # whether or not running
@@ -27,7 +27,7 @@ class Radar_Resp():
         self.lasty = 0
         self.streak = 0
 
-    def get_sub_point(self):
+    def get_sub_point(self): # USE THIS TO GET A DETRENDED POINT BACK
         return self.sub_point
     
     def set_sub_point(self):
@@ -40,7 +40,7 @@ class Radar_Resp():
     def get_correlation(self):
         return self.correlation
     
-    def add_data(self, value):
+    def add_data(self, value): # USE THIS TO ADD A DATA POINT
         self.sample_n += 1
         if len(self.window) >= self.win_size:
             self.window.pop(0)
