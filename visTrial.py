@@ -16,16 +16,16 @@ from scipy.interpolate import interp1d
 
 
 # windowing function takes array and returns array of arrays containing windows
-def get_windows(signal, window_len=10, overlap=1, fz=30):
+def get_windows(signal, window_len=10, overlap=2, fz=30):
     windows = []
     win_dur = int(window_len * fz)
-    win_diff = int(window_len-overlap * fz)
+    win_diff = int((window_len-overlap) * fz)
     #loop through sinal to get windows
     i = 0
-    while i < len(signal):
+    while i < len(signal) - win_dur + 1:
         win = signal[i : i + win_dur]
         windows.append(win)
-        i += win_dur
+        i += win_diff
     return windows
 
 # linear model fit to window using least squares
