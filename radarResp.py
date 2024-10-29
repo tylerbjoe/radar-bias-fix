@@ -96,26 +96,26 @@ import json
 import pandas as pd
 
 # %% For JOSNS
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
-    json_data = json.load(file)
-bins = []
-df = pd.DataFrame(json_data)
-for i in range(6):
-    tmp_b, tmp_a = [], []
-    for j in range(1, len(df["frame_data"])):
-        tmp_b.append(df["frame_data"][j][i])
-    bins.append(tmp_b)
-biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
-sig = integrate.cumulative_trapezoid(biny)
+# with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
+#     json_data = json.load(file)
+# bins = []
+# df = pd.DataFrame(json_data)
+# for i in range(6):
+#     tmp_b, tmp_a = [], []
+#     for j in range(1, len(df["frame_data"])):
+#         tmp_b.append(df["frame_data"][j][i])
+#     bins.append(tmp_b)
+# biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
+# sig = integrate.cumulative_trapezoid(biny)
 
-# #%% csvs
-# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Pneumo.csv"
-# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
-# truth = [int(x) for x in sigs][:15000]
+#%% csvs
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_1\Pneumo.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+truth = [int(x) for x in sigs][:15000]
 
-# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Radar_2.csv"
-# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
-# sig = [float(x) for x in sigs]
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_1\Radar_2.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
+sig = [float(x) for x in sigs]
 #%%
 # Example usage:
 subtracted_sig = []
@@ -154,21 +154,22 @@ fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
 # First subplot: Signal and Linear Model
 axes[0].plot(time_axis,sig, label='Signal', color='blue')#time_axis, 
 axes[0].plot(time_axis,lin_mod, label="LMS Model", color='orange')
-axes[0].plot(time_axis,subtracted_sig, label="Signal Linear Subtracted", color='red')
+axes[0].plot(time_axis,subtracted_sig, label="Detrended (Signal-Model)", color='red')
 # axes[0].plot(time_axis, truth, label='Truth', color='black')
 axes[0].set_ylabel('Displacement (unitless)')
+axes[0].set_xlabel('Time')
 axes[0].legend()
 axes[0].grid()
 axes[0].set_title('Radar', fontsize=16)
-# #%%
-# # Second subplot: Correlation
-# # axes[1].plot(time_axis, corr, label='Correlation', color='green')
-# axes[1].plot(time_axis,truth, label='Pneum', color='black')
-# axes[1].set_xlabel('Time')
-# axes[1].set_ylabel('Displacement (unitless)')
-# axes[1].legend()
-# axes[1].grid()
-# axes[1].set_title('Pneum', fontsize=16)
+#%%
+# Second subplot: Truth
+# axes[1].plot(time_axis, corr, label='Correlation', color='green')
+axes[1].plot(time_axis,truth, label='Pneum', color='black')
+axes[1].set_xlabel('Time')
+axes[1].set_ylabel('Displacement (unitless)')
+axes[1].legend()
+axes[1].grid()
+axes[1].set_title('Pneum', fontsize=16)
 
-# plt.tight_layout()  # Adjust layout for better spacing
-# plt.show()
+plt.tight_layout()  # Adjust layout for better spacing
+plt.show()
