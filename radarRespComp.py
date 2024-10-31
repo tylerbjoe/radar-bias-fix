@@ -6,8 +6,10 @@ from scipy.stats import pearsonr
 from threading import Thread
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
-
-class Radar_Resp():
+import json
+import pandas as pd
+#%% NPI
+class Radar_RespNPI():
     '''' Begin Class '''
     def __init__(self):
         self.fs = 30                    # frequency (Hz)
@@ -69,7 +71,7 @@ class Radar_Resp():
             if x != self.lastnpeak[0] and abs(x-self.lastnpeak[0]) >= 2.25 * self.fs:
                 # if self.lastnpeak != [0,0]:
                 slope = (y-self.lastnpeak[1])/(x-self.lastnpeak[0])
-                if abs(slope) <= 20 or self.lastnpeak == [0,0]:#<+29 or 20
+                if abs(slope) <= 60 or self.lastnpeak == [0,0]:#<+29 or 20
                     self.slope = slope
                         
                     self.set_intercept(self.model_point)
@@ -94,26 +96,90 @@ class Radar_Resp():
         self.running = False
     '''' End Class '''
     
-#%% LEGACY
-    # def set_peak_slope(self):
-    #     last_peaks = find_peaks(self.window, distance=2*30, prominence=200)[0]#1650 prominence when breathold
-    #     if len(last_peaks) >= 1:
-    #         x2 = self.sample_n - (self.win_size - last_peaks[-1])
-    #         y2 = self.window[last_peaks[-1]]
-    #         if len(last_peaks) >= 2:
-    #             x1 = self.sample_n - self.win_size + last_peaks[-2]
-    #             y1 = self.window[last_peaks[-2]]
-    #         else:
-    #             x1 = self.lastnpeak[0]
-    #             y1 = self.lastnpeak[1]
-    #         self.lastnpeak=[x2,y2]
-    #         self.slope = (y1-y2)/(x1-x2)
+#%% LMS
+class Radar_RespLMS():
+    '''' Begin Class '''
+    def __init__(self):
+        self.fs = 30                    # frequency (Hz)
+        
+        self.win_size = 12 * self.fs     # window size (s)
+        self.check_corr = 0.3 * self.fs   # rate to check if model still correlates to signal (s)
+        self.corr_threshold = 0.7       # correlation threshold to refresh model
+        self.window = []                # empty window
+        
+        self.running = False            # whether or not running
+        self.lin_model = []             # empty linear model
+        self.sub_point = 0              # signal point with model subtracted
+        self.linear_point = 0
+        self.correlation = 0            # correlation metric (pearsonr)
+        self.sample_n = 0               # number of samples processed
+        self.slope = 0                  # slope of model
+        self.intercept = 0              # intercept of model
+        self.lasty = 0
+        self.streak = 0
 
-# %% Try on existing data
-import json
-import pandas as pd
+    def get_sub_point(self): # USE THIS TO GET A DETRENDED POINT BACK
+        return self.sub_point
+    
+    def set_sub_point(self):
+        self.set_linear_point()
+        self.sub_point =  self.window[-1] - self.linear_point
 
-# %% For JOSNS
+    def set_correlation(self):
+        self.correlation,_ = pearsonr(self.window, (self.lin_model))
+        
+    def get_correlation(self):
+        return self.correlation
+    
+    def add_data(self, value): # USE THIS TO ADD A DATA POINT
+        self.sample_n += 1
+        if len(self.window) >= self.win_size:
+            self.window.pop(0)
+        self.window.append(value)
+        if len(self.window) == self.win_size:
+            if self.sample_n != self.win_size:
+                self.set_correlation()
+            if (self.sample_n % self.check_corr == 0 and self.correlation<self.corr_threshold) or (self.win_size == self.sample_n):
+                self.set_linear() # make new model if correlation too off and every x seconds
+                self.streak = 0
+            self.streak+=1
+            self.set_sub_point()
+        
+    def set_linear(self):
+        dur = len(self.window)
+        x = np.linspace(0, dur/30, dur)
+        self.intercept = self.linear_point
+        self.slope, intercept, r, p, std_err = stats.linregress(x, self.window)
+        if self.intercept == 0:
+            self.intercept = intercept
+        self.lin_model = self.slope * x + self.intercept
+        
+    def set_linear_point(self):
+        if self.sample_n == self.win_size:
+            self.linear_point = self.slope * (self.sample_n / self.fs) + self.intercept
+            self.intercept = self.linear_point
+        else:
+            self.linear_point = self.slope * (self.streak / self.fs) + self.intercept
+        
+    def get_linear_point(self):
+        return self.linear_point
+    
+    def start(self):
+        self.running = True
+        Thread(target=self._run, daemon=True).start()
+    
+    def _run(self):
+        try:
+            while self.running:
+                print(f"{self.sub_point} Linear subtracted point")
+                time.sleep(1/30000)
+        except:
+            self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
+
+    def stop(self):
+        self.running = False
+    '''' End Class '''
+# %% JOSNS
 # with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
 #     json_data = json.load(file)
 # bins = []
@@ -126,59 +192,54 @@ import pandas as pd
 # biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
 # sig = integrate.cumulative_trapezoid(biny)
 
-#%% csvs
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Pneumo.csv"
-sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
-truth = [int(x) for x in sigs][500*30:]
+#%% CSVS
+start = 150 *30
+end = 400 *30
 
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Radar_2.csv"
-sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
+file_path = r"C:\Users\tigsy\OneDrive\Documents\Radar Bias Fix Data\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_8_quest\Pneumo.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+truth = [int(x) for x in sigs][start:end]
+
+file_path = r"C:\Users\tigsy\OneDrive\Documents\Radar Bias Fix Data\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_8_quest\Radar_2.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][start:end]
 sig = [float(x) for x in sigs]
 sig=np.array(sig)
 #%%
 # Example usage:
-subtracted_sig = []
-lin_mod = []
-corr=[]
-npeaks = []
-slopes=[]
+npi_sig = []
+lms_sig = []
 
-rr = Radar_Resp()
+rrNPI = Radar_RespNPI()
+rrLMS = Radar_RespLMS()
 
 i=0
-rr.start()
+rrNPI.start()
+rrLMS.start()
 try:
     while i<len(sig):
-        rr.add_data(sig[i])
-        subtracted_sig.append(rr.get_sub_point())
-        lin_mod.append(rr.get_model_point())
-        slopes.append(rr.get_slope())
-        # npeaks.append(rr.get_npeak())
-        # corr.append(rr.get_correlation())
+        rrNPI.add_data(sig[i])
+        rrLMS.add_data(sig[i])
+        lms_sig.append(rrLMS.get_sub_point())
+        npi_sig.append(rrNPI.get_sub_point())
         time.sleep(1/300000)  # Simulate real-time data feed
         i+=1
         
 except KeyboardInterrupt:
     print("Stopping thread due to keyboard interruption.")
+rrNPI.stop()
+rrLMS.stop()
 
-rr.stop()
-npeaks=[]
-nnpeaks = rr.get_npeaks()
-for peak in nnpeaks:
-    npeaks.append(peak)
 
 #%%
 time_axis = np.arange(len(sig)) / 30  # Time in seconds
 # Create subplots
 fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
-
+fig.suptitle('Subject 8')
 # First subplot: Signal and Linear Model
-axes[0].plot(time_axis,sig, label='Signal', color='blue')
-axes[0].scatter(time_axis[npeaks],sig[npeaks], label="Detected Negative Peak", color='orange')
-axes[0].plot(time_axis,lin_mod, label="NPI Model", color='orange')
-axes[0].plot(time_axis,subtracted_sig, label="Detrended (Signal-Model)", color='red')
-
-
+# axes[0].plot(time_axis,sig, label='Signal', color='blue')
+# axes[0].scatter(time_axis[npeaks],sig[npeaks], label="Detected Negative Peak", color='orange')
+axes[0].plot(time_axis,npi_sig, label="NPI", color='blue')
+axes[0].plot(time_axis,lms_sig, label="LMS", color='darkorange')
 
 # for peak in npeaks:
 #     axes[0].scatter(time_axis[peak[0]],peak[1], color='orange')    
@@ -188,14 +249,13 @@ axes[0].set_ylabel('Displacement (unitless)')
 axes[0].set_xlabel('Time')
 axes[0].legend()
 axes[0].grid()
-axes[0].set_title('Radar', fontsize=16)
+axes[0].set_title('Detrended Radar', fontsize=16)
 
-# axes[1].plot(time_axis,slopes, label="Slopes", color='magenta')
 #%%
-# Second subplot: Correlation
-# axes[1].plot(time_axis, corr, label='Correlation', color='green')
-axes[1].plot(time_axis,truth, label='Pneum', color='black')
-axes[1].set_xlabel('Time')
+# Second subplot: Pneum
+time2 = np.arange(len(truth)) / 30
+axes[1].plot(time2,truth, label='Pneum', color='black')
+axes[1].set_xlabel('Time (s)')
 axes[1].set_ylabel('Displacement (unitless)')
 axes[1].legend()
 axes[1].grid()
