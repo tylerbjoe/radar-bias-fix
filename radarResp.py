@@ -109,11 +109,11 @@ import pandas as pd
 # sig = integrate.cumulative_trapezoid(biny)
 
 #%% csvs
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_1\Pneumo.csv"
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Pneumo.csv"
 sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
 truth = [int(x) for x in sigs][:15000]
 
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_1\Radar_2.csv"
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Radar_2.csv"
 sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
 sig = [float(x) for x in sigs]
 #%%

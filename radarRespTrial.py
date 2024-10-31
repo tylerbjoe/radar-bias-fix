@@ -69,7 +69,7 @@ class Radar_Resp():
             if x != self.lastnpeak[0] and abs(x-self.lastnpeak[0]) >= 2.25 * self.fs:
                 # if self.lastnpeak != [0,0]:
                 slope = (y-self.lastnpeak[1])/(x-self.lastnpeak[0])
-                if abs(slope) <= 60 or self.lastnpeak == [0,0]:#<+29 or 20
+                if abs(slope) <= 20 or self.lastnpeak == [0,0]:#<+29 or 20
                     self.slope = slope
                         
                     self.set_intercept(self.model_point)
@@ -127,11 +127,11 @@ import pandas as pd
 # sig = integrate.cumulative_trapezoid(biny)
 
 #%% csvs
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Pneumo.csv"
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Pneumo.csv"
 sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
 truth = [int(x) for x in sigs][:15000]
 
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Radar_2.csv"
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Radar_2.csv"
 sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
 sig = [float(x) for x in sigs]
 sig=np.array(sig)
