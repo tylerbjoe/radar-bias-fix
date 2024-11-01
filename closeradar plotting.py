@@ -62,14 +62,14 @@ class Radar_Resp_NPI():
         self.set_sub_point(self.window[-1] - self.model_point)
         
     def check_new_peak(self):
-        last_peaks = find_peaks(np.negative(self.window), prominence=250)[0]#1650 prominence when breathold #250 for other??? distance=2*30,, prominence=250
+        last_peaks = find_peaks(np.negative(self.window), prominence=150)[0]#1650 prominence when breathold #250 for other??? distance=2*30,, prominence=250
         if len(last_peaks) != 0:
             x = self.sample_n - (self.win_size - last_peaks[-1])
             y = self.window[last_peaks[-1]]
             if x != self.lastnpeak[0] and abs(x-self.lastnpeak[0]) >= 2.25 * self.fs:
                 # if self.lastnpeak != [0,0]:
                 slope = (y-self.lastnpeak[1])/(x-self.lastnpeak[0])
-                if abs(slope) <= 20 or self.lastnpeak == [0,0]:#<+29 or 20
+                if abs(slope) <= 60 or self.lastnpeak == [0,0]:#<+29 or 20
                     self.slope = slope
                         
                     self.set_intercept(self.model_point)
@@ -77,6 +77,9 @@ class Radar_Resp_NPI():
                     self.n_peaks.append(x)
                     return True
                 return False
+            
+    def clear_window(self):
+        self.window = np.zeros(self.win_size)
 
     def start(self):
         self.running = True
@@ -102,7 +105,7 @@ class Radar_Resp_LMS():
         self.win_size = 12 * self.fs     # window size (s)
         self.check_corr = 0.3 * self.fs   # rate to check if model still correlates to signal (s)
         self.corr_threshold = 0.7       # correlation threshold to refresh model
-        self.window = []                # empty window
+        self.window = np.zeros(self.win_size)              # empty window
         
         self.running = False            # whether or not running
         self.lin_model = []             # empty linear model
@@ -130,10 +133,9 @@ class Radar_Resp_LMS():
     
     def add_data(self, value): # USE THIS TO ADD A DATA POINT
         self.sample_n += 1
-        if len(self.window) >= self.win_size:
-            self.window.pop(0)
-        self.window.append(value)
-        if len(self.window) == self.win_size:
+        self.window = np.roll(self.window, -1)
+        self.window[-1] = value
+        if self.sample_n >= self.win_size:
             if self.sample_n != self.win_size:
                 self.set_correlation()
             if (self.sample_n % self.check_corr == 0 and self.correlation<self.corr_threshold) or (self.win_size == self.sample_n):
@@ -160,6 +162,9 @@ class Radar_Resp_LMS():
         
     def get_linear_point(self):
         return self.linear_point
+    
+    def clear_window(self):
+        self.window = np.zeros(self.win_size)
     
     def start(self):
         self.running = True
@@ -180,6 +185,7 @@ class Radar_Resp_LMS():
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 from scipy import integrate
 #%% CSVS
 # file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Pneumo.csv"
@@ -192,7 +198,8 @@ from scipy import integrate
 # sig=np.array(sig)
 
 #%% JSONS
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\deep_breathing\deep_breathing1\Radar_1_metadata_1730400528.2477555.json", 'r') as file:
+title = "ToB3 radar 2"
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\Top_of_Breath\ToB3\Radar_2_metadata_1730402627.3732631.json", 'r') as file:
     json_data = json.load(file)
 bins = []
 df = pd.DataFrame(json_data)
@@ -201,80 +208,102 @@ for i in range(6):
     for j in range(1, len(df["frame_data"])):
         tmp_b.append(df["frame_data"][j][i])
     bins.append(tmp_b)
-biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
+biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4])]#,bins[5])]
 sig = integrate.cumulative_trapezoid(biny)
 
 #%% Run Algs
 npi_sig = []
 lms_sig = []
 
-npi_mod = []
-lms_mod = []
-
+# npi_mod = []
+# lms_mod = []
+for i in range(6):
+    bins[i] = bins[i][1:]
+bins[4]=sig.tolist()
 rrNPI = Radar_Resp_NPI()
 rrLMS = Radar_Resp_LMS()
 
-i=0
-# rrNPI.start()
-# rrLMS.start()
-try:
-    while i<len(sig):
-        rrNPI.add_data(sig[i])
-        rrLMS.add_data(sig[i])
-        
-        npi_sig.append(rrNPI.get_sub_point())
-        lms_sig.append(rrLMS.get_sub_point())
-        
-        npi_mod.append(rrNPI.get_model_point())
-        lms_mod.append(rrLMS.get_linear_point())
-        
-        # npeaks.append(rr.get_npeak())
-        # corr.append(rr.get_correlation())
-        # time.sleep(1/300000)  # Simulate real-time data feed
-        i+=1
-        
-except KeyboardInterrupt:
-    print("Stopping thread due to keyboard interruption.")
+for i in range(5):
+    npi_bin_sig, lms_bin_sig = [], []
+    
+    # Process current bin
+    for val in bins[i]:
+        rrNPI.add_data(val)
+        rrLMS.add_data(val)
+        npi_bin_sig.append(rrNPI.get_sub_point())
+        lms_bin_sig.append(rrLMS.get_sub_point())
+    
+    # Append processed signals for each bin to npi_sig and lms_sig
+    npi_sig.append(npi_bin_sig)
+    lms_sig.append(lms_bin_sig)
+    
+    # Clear window between each bin processing
+    rrNPI.clear_window()
+    rrLMS.clear_window()
 
-# rrNPI.stop()
-# rrLMS.stop()
-npeaks=[]
-# nnpeaks = rr.get_npeaks()
-# for peak in nnpeaks:
-#     npeaks.append(peak)
+# i=0
+# # rrNPI.start()
+# # rrLMS.start()
+# npi_sigs = []
+# lms_sigs = []
+# while i<len(sig):
+#     rrNPI.add_data(sig[i])
+#     rrLMS.add_data(sig[i])
+        
+#     npi_sigs.append(rrNPI.get_sub_point())
+#     lms_sigs.append(rrLMS.get_sub_point())
+# npi_sig.append(npi_sigs)
+# lms_sig.append(lms_sigs)
+        
+#         # npi_mod.append(rrNPI.get_model_point())
+#         # lms_mod.append(rrLMS.get_linear_point())
+        
+#         # npeaks.append(rr.get_npeak())
+#         # corr.append(rr.get_correlation())
+#         # time.sleep(1/300000)  # Simulate real-time data feed
+#         i+=1
+        
+# except KeyboardInterrupt:
+#     print("Stopping thread due to keyboard interruption.")
+
+# # rrNPI.stop()
+# # rrLMS.stop()
+# npeaks=[]
+# # nnpeaks = rr.get_npeaks()
+# # for peak in nnpeaks:
+# #     npeaks.append(peak)
+
 #%% Plot
-time_axis = np.arange(len(sig)) / 30  # Time in seconds
+time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
 # Create subplots
-fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
-axes[0].set_title('Radar', fontsize=16)
-axes[0].plot(time_axis,sig, label='Signal', color='red')
-axes[0].plot(time_axis,npi_mod, label="NPI Model", linestyle='--', color='blue')
-axes[0].plot(time_axis,lms_mod, label="LMS Model", linestyle='--', color='darkorange')
-axes[0].grid()
-axes[0].legend()
-axes[0].set_ylabel('Displacement (unitless)')
+fig, axes = plt.subplots(5, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+fig.suptitle(title, fontsize=20, fontweight='bold')
+for i in range(4):
+    axes[i].set_title(f'Bin {i+1}', fontsize=16)
+    axes[i].plot(time_axis,bins[i], label='raw', color='black', linewidth=3)
+    axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+    axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    axes[i].grid()
+    axes[i].legend()
+    axes[i].set_ylabel('Displacement (unitless)')
 
-# 2nd subplot: Signal and Linear Model
-axes[1].plot(time_axis,npi_sig, label="Detrended NPI", color='blue')
-axes[1].plot(time_axis,lms_sig, label="Detrended LMS", color='darkorange')
-axes[1].set_ylabel('Displacement (unitless)')
-axes[1].legend()
-axes[1].grid()
-axes[1].set_title('Subtract Model', fontsize=16)
 
-# 3rd subplot: Pneum
-# time2 = np.arange(len(truth)) / 30
+# 5th subplot: integrated bins 1-4
+axes[4].set_title('Integrated 1-4', fontsize=16)
+axes[4].plot(time_axis,bins[4], label='raw', color='black', linewidth=3)
+axes[4].plot(time_axis,npi_sig[4], label="Detrended NPI", color='blue')
+axes[4].plot(time_axis,lms_sig[4], label="Detrended LMS", color='darkorange')
+axes[4].set_xlabel('Time (s)')
+axes[4].set_ylabel('Displacement (unitless)')
+axes[4].legend()
+axes[4].grid()
 
-# axes[2].plot(time2,truth, label='Pneum', color='black')
-# axes[2].set_xlabel('Time (s)')
-# axes[2].set_ylabel('Displacement (unitless)')
-# axes[2].legend()
-# axes[2].grid()
-# axes[2].set_title('Pneum', fontsize=16)
 
-# plt.tight_layout()  # Adjust layout for better spacing
-# plt.show()
-
+plt.tight_layout()  # Adjust layout for better spacing
+output_folder = r"C:\Users\TJoe\Documents\Radar Offset Fix\close range testing plots"
+output_path = os.path.join(output_folder, f"{title}.png")
+fig.savefig(output_path, dpi=100)
+plt.show()
 
 
 
@@ -290,85 +319,4 @@ axes[1].set_title('Subtract Model', fontsize=16)
 
 
 
-class Radar_Resp_LMS():
-    '''' Begin Class '''
-    def __init__(self):
-        self.fs = 30                    # frequency (Hz)
-        
-        self.win_size = 12 * self.fs     # window size (s)
-        self.check_corr = 0.3 * self.fs   # rate to check if model still correlates to signal (s)
-        self.corr_threshold = 0.7       # correlation threshold to refresh model
-        self.window = []                # empty window
-        
-        self.running = False            # whether or not running
-        self.lin_model = []             # empty linear model
-        self.sub_point = 0              # signal point with model subtracted
-        self.linear_point = 0
-        self.correlation = 0            # correlation metric (pearsonr)
-        self.sample_n = 0               # number of samples processed
-        self.slope = 0                  # slope of model
-        self.intercept = 0              # intercept of model
-        self.lasty = 0
-        self.streak = 0
 
-    def get_sub_point(self): # USE THIS TO GET A DETRENDED POINT BACK
-        return self.sub_point
-    
-    def set_sub_point(self):
-        self.set_linear_point()
-        self.sub_point =  self.window[-1] - self.linear_point
-
-    def set_correlation(self):
-        self.correlation,_ = pearsonr(self.window, (self.lin_model))
-        
-    def get_correlation(self):
-        return self.correlation
-    
-    def add_data(self, value): # USE THIS TO ADD A DATA POINT
-        self.sample_n += 1
-        if len(self.window) >= self.win_size:
-            self.window.pop(0)
-        self.window.append(value)
-        if len(self.window) == self.win_size:
-            if self.sample_n != self.win_size:
-                self.set_correlation()
-            if (self.sample_n % self.check_corr == 0 and self.correlation<self.corr_threshold) or (self.win_size == self.sample_n):
-                self.set_linear() # make new model if correlation too off and every x seconds
-                self.streak = 0
-            self.streak+=1
-            self.set_sub_point()
-        
-    def set_linear(self):
-        dur = len(self.window)
-        x = np.linspace(0, dur/30, dur)
-        self.intercept = self.linear_point
-        self.slope, intercept, r, p, std_err = stats.linregress(x, self.window)
-        if self.intercept == 0:
-            self.intercept = intercept
-        self.lin_model = self.slope * x + self.intercept
-        
-    def set_linear_point(self):
-        if self.sample_n == self.win_size:
-            self.linear_point = self.slope * (self.sample_n / self.fs) + self.intercept
-            self.intercept = self.linear_point
-        else:
-            self.linear_point = self.slope * (self.streak / self.fs) + self.intercept
-        
-    def get_linear_point(self):
-        return self.linear_point
-    
-    def start(self):
-        self.running = True
-        Thread(target=self._run, daemon=True).start()
-    
-    def _run(self):
-        try:
-            while self.running:
-                print(f"{self.sub_point} Linear subtracted point")
-                time.sleep(1/30000)
-        except:
-            self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
-
-    def stop(self):
-        self.running = False
-    '''' End Class '''

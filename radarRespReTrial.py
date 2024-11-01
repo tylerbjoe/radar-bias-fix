@@ -62,7 +62,7 @@ class Radar_Resp():
         self.set_sub_point(self.window[-1] - self.model_point)
         
     def check_new_peak(self):
-        last_peaks = find_peaks(np.negative(self.window), prominence=250)[0]#1650 prominence when breathold #250 for other??? distance=2*30,, prominence=250
+        last_peaks = find_peaks(np.negative(self.window), prominence=150)[0]#1650 prominence when breathold #250 for other??? distance=2*30,, prominence=250
         if len(last_peaks) != 0:
             x = self.sample_n - (self.win_size - last_peaks[-1])
             y = self.window[last_peaks[-1]]
@@ -78,6 +78,9 @@ class Radar_Resp():
                     return True
                 return False
 
+    def clear_window(self):
+        self.window = np.zeros(self.win_size)
+
     def start(self):
         self.running = True
         Thread(target=self._run, daemon=True).start()
@@ -85,7 +88,7 @@ class Radar_Resp():
     def _run(self):
         try:
             while self.running:
-                # print(f"{self.sub_point} Linear subtracted point")
+                print(f"{self.sub_point} Linear subtracted point")
                 time.sleep(1/300000)
         except:
             self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
@@ -93,26 +96,12 @@ class Radar_Resp():
     def stop(self):
         self.running = False
     '''' End Class '''
-    
-#%% LEGACY
-    # def set_peak_slope(self):
-    #     last_peaks = find_peaks(self.window, distance=2*30, prominence=200)[0]#1650 prominence when breathold
-    #     if len(last_peaks) >= 1:
-    #         x2 = self.sample_n - (self.win_size - last_peaks[-1])
-    #         y2 = self.window[last_peaks[-1]]
-    #         if len(last_peaks) >= 2:
-    #             x1 = self.sample_n - self.win_size + last_peaks[-2]
-    #             y1 = self.window[last_peaks[-2]]
-    #         else:
-    #             x1 = self.lastnpeak[0]
-    #             y1 = self.lastnpeak[1]
-    #         self.lastnpeak=[x2,y2]
-    #         self.slope = (y1-y2)/(x1-x2)
+
 
 # %% Try on existing data
 import json
 import pandas as pd
-
+from scipy.interpolate import interp1d
 # %% For JOSNS
 # with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
 #     json_data = json.load(file)
@@ -127,80 +116,86 @@ import pandas as pd
 # sig = integrate.cumulative_trapezoid(biny)
 
 #%% csvs
-# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Pneumo.csv"
-# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
-# truth = [int(x) for x in sigs][500*30:]
+start = 600 * 30
+end = 800 * 30
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Pneumo.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+truth = [int(x) for x in sigs][start:end]
 
-# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Radar_2.csv"
-# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
-# sig = [float(x) for x in sigs]
-# sig=np.array(sig)
-# #%%
-# # Example usage:
-# subtracted_sig = []
-# lin_mod = []
-# corr=[]
-# npeaks = []
-# slopes=[]
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_1\Radar_2.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+sig = [float(x) for x in sigs][start:end]
+sig=np.array(sig)
+#%%
+# Example usage:
+subtracted_sig = []
+lin_mod = []
+corr=[]
+npeaks = []
+slopes=[]
 
-# rr = Radar_Resp()
+rr = Radar_Resp()
 
-# i=0
+i=0
 # rr.start()
-# try:
-#     while i<len(sig):
-#         rr.add_data(sig[i])
-#         subtracted_sig.append(rr.get_sub_point())
-#         lin_mod.append(rr.get_model_point())
-#         slopes.append(rr.get_slope())
-#         # npeaks.append(rr.get_npeak())
-#         # corr.append(rr.get_correlation())
-#         time.sleep(1/300000)  # Simulate real-time data feed
-#         i+=1
+try:
+    while i<len(sig):
+        rr.add_data(sig[i])
+        subtracted_sig.append(rr.get_sub_point())
+        lin_mod.append(rr.get_model_point())
+        slopes.append(rr.get_slope())
+        # npeaks.append(rr.get_npeak())
+        # corr.append(rr.get_correlation())
+        # time.sleep(1/300000)  # Simulate real-time data feed
+        i+=1
         
-# except KeyboardInterrupt:
-#     print("Stopping thread due to keyboard interruption.")
+except KeyboardInterrupt:
+    print("Stopping thread due to keyboard interruption.")
 
 # rr.stop()
-# npeaks=[]
-# nnpeaks = rr.get_npeaks()
-# for peak in nnpeaks:
-#     npeaks.append(peak)
+npeaks=[]
+nnpeaks = rr.get_npeaks()
+for peak in nnpeaks:
+    npeaks.append(peak)
+    
+negative_peak_values = sig[nnpeaks]
 
-# #%%
-# time_axis = np.arange(len(sig)) / 30  # Time in seconds
-# # Create subplots
-# fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+interpolator = interp1d(nnpeaks, negative_peak_values, kind='linear', fill_value="extrapolate")
+interpolated_signal = interpolator(np.arange(len(sig)))#[peaks[0]:peaks[-1]])))
 
-# # First subplot: Signal and Linear Model
-# axes[0].plot(time_axis,sig, label='Signal', color='blue')
-# axes[0].scatter(time_axis[npeaks],sig[npeaks], label="Detected Negative Peak", color='orange')
-# axes[0].plot(time_axis,lin_mod, label="NPI Model", color='orange')
-# axes[0].plot(time_axis,subtracted_sig, label="Detrended (Signal-Model)", color='red')
+#%%
+time_axis = np.arange(len(sig)) / 30  # Time in seconds
+# Create subplots
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+
+# First subplot: Signal and Linear Model
+axes[0].plot(time_axis,sig, label='Signal', color='blue')
+axes[0].scatter(time_axis[npeaks],sig[npeaks], label="Detected Negative Peak", color='darkorange')
+axes[0].plot(time_axis,lin_mod, label="NPI Model", color='orange')
+axes[0].plot(time_axis,subtracted_sig, label="Detrended (Signal-Model)", color='red')
+axes[0].plot(time_axis,interpolated_signal,label="interpolated peaks", color='orange')
 
 
+axes[0].set_ylabel('Displacement (unitless)')
+axes[0].set_xlabel('Time')
+axes[0].legend()
+axes[0].grid()
+axes[0].set_title('Radar', fontsize=16)
 
-# # for peak in npeaks:
-# #     axes[0].scatter(time_axis[peak[0]],peak[1], color='orange')    
+#%%
+# Second subplot: Correlation
+time2 = np.arange(len(truth)) / 30
+axes[1].plot(time2
+              ,truth, label='Pneum', color='black')
+axes[1].set_xlabel('Time')
+axes[1].set_ylabel('Displacement (unitless)')
+axes[1].legend()
+axes[1].grid()
+axes[1].set_title('Pneum', fontsize=16)
 
-# # axes[0].plot(time_axis, truth, label='Truth', color='black')
-# axes[0].set_ylabel('Displacement (unitless)')
-# axes[0].set_xlabel('Time')
-# axes[0].legend()
-# axes[0].grid()
-# axes[0].set_title('Radar', fontsize=16)
+plt.tight_layout()  # Adjust layout for better spacing
+plt.show()
 
-# # axes[1].plot(time_axis,slopes, label="Slopes", color='magenta')
-# #%%
-# # Second subplot: Correlation
-# time2 = np.arange(len(truth)) / 30
-# axes[1].plot(time2
-#              ,truth, label='Pneum', color='black')
-# axes[1].set_xlabel('Time')
-# axes[1].set_ylabel('Displacement (unitless)')
-# axes[1].legend()
-# axes[1].grid()
-# axes[1].set_title('Pneum', fontsize=16)
-
-# plt.tight_layout()  # Adjust layout for better spacing
-# plt.show()
+#%% Correlation
+correlation,_ = pearsonr(interpolated_signal, subtracted_sig)
+print(correlation)
