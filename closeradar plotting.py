@@ -80,6 +80,9 @@ class Radar_Resp_NPI():
             
     def clear_window(self):
         self.window = np.zeros(self.win_size)
+        
+    def reset_sample_n(self):
+        self.sample_n = 0;
 
     def start(self):
         self.running = True
@@ -163,6 +166,9 @@ class Radar_Resp_LMS():
     def get_linear_point(self):
         return self.linear_point
     
+    def reset_sample_n(self):
+        self.sample_n = 0;
+    
     def clear_window(self):
         self.window = np.zeros(self.win_size)
     
@@ -187,6 +193,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from scipy import integrate
+
+def get_summation(biny):
+    total_bin = []
+    total = 0
+    for i in range(len(biny)):
+       total += biny[i]
+       total_bin.append(total)
+    return total_bin
 #%% CSVS
 # file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Pneumo.csv"
 # sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
@@ -197,9 +211,10 @@ from scipy import integrate
 # sig = [float(x) for x in sigs]
 # sig=np.array(sig)
 
+
 #%% JSONS
-title = "ToB3 radar 2"
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\Top_of_Breath\ToB3\Radar_2_metadata_1730402627.3732631.json", 'r') as file:
+title = "Bins 1-4 fb3 r1"
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\fast_breathing\fast_breathing3\Radar_1_metadata_1730403060.3604577.json", 'r') as file:
     json_data = json.load(file)
 bins = []
 df = pd.DataFrame(json_data)
@@ -208,18 +223,20 @@ for i in range(6):
     for j in range(1, len(df["frame_data"])):
         tmp_b.append(df["frame_data"][j][i])
     bins.append(tmp_b)
-biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4])]#,bins[5])]
-sig = integrate.cumulative_trapezoid(biny)
+biny = [sum(values) for values in zip(bins[1],bins[2],bins[3],bins[4])]#,bins[5])]bins[0],
+# biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
+# sig = integrate.cumulative_trapezoid(biny)#get_summation(biny)#
+integrated_bins = []
+
+for i in range(1,5):
+    integrated_bins.append(get_summation(bins[i]))
+integrated_bins.append(get_summation(biny))
+
 
 #%% Run Algs
 npi_sig = []
 lms_sig = []
 
-# npi_mod = []
-# lms_mod = []
-for i in range(6):
-    bins[i] = bins[i][1:]
-bins[4]=sig.tolist()
 rrNPI = Radar_Resp_NPI()
 rrLMS = Radar_Resp_LMS()
 
@@ -227,7 +244,7 @@ for i in range(5):
     npi_bin_sig, lms_bin_sig = [], []
     
     # Process current bin
-    for val in bins[i]:
+    for val in integrated_bins[i]:
         rrNPI.add_data(val)
         rrLMS.add_data(val)
         npi_bin_sig.append(rrNPI.get_sub_point())
@@ -237,62 +254,42 @@ for i in range(5):
     npi_sig.append(npi_bin_sig)
     lms_sig.append(lms_bin_sig)
     
-    # Clear window between each bin processing
+    # Clear window between each bin processing/reset sample number
     rrNPI.clear_window()
     rrLMS.clear_window()
+    rrNPI.reset_sample_n()
+    rrLMS.reset_sample_n()
 
-# i=0
-# # rrNPI.start()
-# # rrLMS.start()
-# npi_sigs = []
-# lms_sigs = []
-# while i<len(sig):
-#     rrNPI.add_data(sig[i])
-#     rrLMS.add_data(sig[i])
-        
-#     npi_sigs.append(rrNPI.get_sub_point())
-#     lms_sigs.append(rrLMS.get_sub_point())
-# npi_sig.append(npi_sigs)
-# lms_sig.append(lms_sigs)
-        
-#         # npi_mod.append(rrNPI.get_model_point())
-#         # lms_mod.append(rrLMS.get_linear_point())
-        
-#         # npeaks.append(rr.get_npeak())
-#         # corr.append(rr.get_correlation())
-#         # time.sleep(1/300000)  # Simulate real-time data feed
-#         i+=1
-        
-# except KeyboardInterrupt:
-#     print("Stopping thread due to keyboard interruption.")
-
-# # rrNPI.stop()
-# # rrLMS.stop()
-# npeaks=[]
-# # nnpeaks = rr.get_npeaks()
-# # for peak in nnpeaks:
-# #     npeaks.append(peak)
 
 #%% Plot
-time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
+# time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
+time_axis = np.arange(len(integrated_bins[1])) / 30  # Time in seconds
 # Create subplots
-fig, axes = plt.subplots(5, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+fig, axes = plt.subplots(5, 1, figsize=(10, 8), sharex=True, sharey=True)  # 2 rows, 1 column
 fig.suptitle(title, fontsize=20, fontweight='bold')
 for i in range(4):
     axes[i].set_title(f'Bin {i+1}', fontsize=16)
-    axes[i].plot(time_axis,bins[i], label='raw', color='black', linewidth=3)
-    axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
-    axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    # axes[i].plot(time_axis,bins[i], label='raw velocity', color='black', linewidth=3)
+    # # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+    # # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    # axes[i].set_ylabel('Velocity')
+    
+    axes[i].plot(time_axis,integrated_bins[i], label='raw displacement', color='black', linewidth=3)
+    # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+    # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    axes[i].set_ylabel('Displacement (unitless)')
+    
     axes[i].grid()
     axes[i].legend()
-    axes[i].set_ylabel('Displacement (unitless)')
+    
 
 
 # 5th subplot: integrated bins 1-4
 axes[4].set_title('Integrated 1-4', fontsize=16)
-axes[4].plot(time_axis,bins[4], label='raw', color='black', linewidth=3)
-axes[4].plot(time_axis,npi_sig[4], label="Detrended NPI", color='blue')
-axes[4].plot(time_axis,lms_sig[4], label="Detrended LMS", color='darkorange')
+integrated_plot_sig = np.array(integrated_bins[4]) / 4
+axes[4].plot(time_axis,integrated_plot_sig, label='raw displacement', color='black', linewidth=3)
+# axes[4].plot(time_axis,npi_sig[4], label="Detrended NPI", color='blue')
+# axes[4].plot(time_axis,lms_sig[4], label="Detrended LMS", color='darkorange')
 axes[4].set_xlabel('Time (s)')
 axes[4].set_ylabel('Displacement (unitless)')
 axes[4].legend()
@@ -302,15 +299,41 @@ axes[4].grid()
 plt.tight_layout()  # Adjust layout for better spacing
 output_folder = r"C:\Users\TJoe\Documents\Radar Offset Fix\close range testing plots"
 output_path = os.path.join(output_folder, f"{title}.png")
-fig.savefig(output_path, dpi=100)
+# fig.savefig(output_path, dpi=100)
 plt.show()
 
 
 
+#%% plot the 6 bins
+time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
+# Create subplots
+fig, axes = plt.subplots(6, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+fig.suptitle(title, fontsize=20, fontweight='bold')
+for i in range(6):
+    axes[i].set_title(f'Bin {i}', fontsize=16)
+    # axes[i].plot(time_axis,bins[i], label='raw velocity', color='black', linewidth=3)
+    # # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+    # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    axes[i].set_ylabel('Velocity')
+    
+    axes[i].plot(time_axis,bins[i], label='raw displacement', color='black', linewidth=3)
+    # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+    # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    # axes[i].set_ylabel('Displacement (unitless)')
+    
+    axes[i].grid()
+    axes[i].legend()
 
-
-
-
+#%% different combinations of bins integrated
+# time_axis = np.arange(len(integrated_bins[1])) / 30  # Time in seconds
+# plt.figure()
+# plt.title('Bin Combination Displacements', fontsize=16)
+# plt.plot(integrated_bins[0], label='bins 0-5')
+# plt.plot(integrated_bins[1], label='bins 1-4')
+# plt.ylabel('Displacement (unitless)')
+# plt.xlabel('Time (s)')
+# plt.legend()
+# plt.grid()
 
 
 

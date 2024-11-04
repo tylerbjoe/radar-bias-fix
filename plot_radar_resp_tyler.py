@@ -291,44 +291,12 @@ def plot_sigs(folder):
     """
     Use the example contained in the laod_lx6 function to overlay the annotations onto the plots here
     """
-                
-    # lx6_dict = ldata
-    # annotation_dict = ldata_annotations
-    # ann_keys = list(annotation_dict.keys())
-    # fig = plt.figure()
-    # fig_spec = gridspec.GridSpec(nrows=len(lx6_dict)-3, ncols=1, hspace=0.30)
-    # axs_dict = {}
-    # start_axs = 0
-    # for key in lx6_dict:
-    #     if key not in ['rate', 'Seconds(X)', 'Annotations']:
-    #         axs_dict[start_axs] = fig.add_subplot(fig_spec[start_axs])
-    #         norm_sig = (lx6_dict[key]-lx6_dict[key].min())/(lx6_dict[key].max()-lx6_dict[key].min())
-    #         axs_dict[start_axs].plot(lx6_dict['Seconds(X)'], norm_sig, label=key)
-    #         axs_dict[start_axs].set_ylabel('Displacement (unitless)')
-    #         axs_dict[start_axs].legend()
-    #         for annot in annotation_dict:
-    #             if isinstance(annotation_dict[annot], list):
-    #                 axs_dict[start_axs].axvspan(xmin=annotation_dict[annot][0], xmax=annotation_dict[annot][1], ymin=-1, ymax=+1, color='black', alpha=0.10)
-    #                 axs_dict[start_axs].text(annotation_dict[annot][0], .9, annot, fontsize=10)
-    #             else:
-    #                 for pt in annotation_dict[annot]:
-    #                     axs_dict[start_axs].axvline(x=pt, ymin=-1, ymax=+1, color='black', linewidth=1)
-    #                     axs_dict[start_axs].text(annotation_dict[annot][0], .9, annot, fontsize=10)
-    #         start_axs += 1
-    # axs_dict[start_axs-1].set_xlabel('Time(s)')
-    # # plt.tight_layout()
-    # plt.show(block=True)
-    
-
     lx6_dict = ldata
     annotation_dict = ldata_annotations
-    ann_keys = list(annotation_dict.keys())
-    
     # Create figure
     fig = plt.figure()
     fig_spec = gridspec.GridSpec(nrows=len(lx6_dict) - 3, ncols=1, hspace=0.30)
     axs_dict = {}
-    
     start_axs = 0
     for key in lx6_dict:
         if key not in ['rate', 'Seconds(X)', 'Annotations']:
@@ -361,10 +329,12 @@ def plot_sigs(folder):
             start_axs += 1
     
     # Set the xlabel on the last subplot
+    axs_dict[0].set_title('Pneum Abdomen')
+    axs_dict[1].set_title('Pneum Chest')
     axs_dict[start_axs - 1].set_xlabel('Time(s)')
     
-    # plt.show(block=True)
-
+    plt.show()
+    
     # # Set xticks
     # for each_axs in fig.axes:
     #     each_axs.grid(which='major', axis='x', color='grey', alpha=0.50, linewidth=1)  
