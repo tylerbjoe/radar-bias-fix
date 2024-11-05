@@ -285,7 +285,8 @@ class Radar_Resp_NPI():
             if self.check_new_peak():
                 self.streak = 0
         self.streak += 1
-        self.set_model_point()
+        if len(self.n_peaks) > 1:#take away
+            self.set_model_point()
         self.set_sub_point(self.window[-1] - self.model_point)
         
     def check_new_peak(self):
@@ -340,7 +341,8 @@ class Radar_Resp_NPI():
 
 #%% JSONS
 title = "Bins 1-4 fast_breathing3 radar 1"
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\fast_breathing\fast_breathing3\Radar_1_metadata_1730403060.3604577.json", 'r') as file:
+# "C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\fast_breathing\fast_breathing3\Radar_1_metadata_1730403060.3604577.json"
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\Top_of_Breath\ToB2\Radar_1_metadata_1730402495.8949175.json", 'r') as file:
     json_data = json.load(file)
 bins = []
 df = pd.DataFrame(json_data)
@@ -374,17 +376,17 @@ integrated_window_mean_bins = []
 for i in range(5):
     integrated_window_mean_bins.append(get_summation(window_mean_bins[i]))
 
-rr = Radar_Resp_NPI()
-lms_bins = []
-for i in range(5):
-    holder = []
-    for val in filtered_integrated_bins[i]:
-        rr.add_data(val)
-        holder.append(rr.get_sub_point())
-    lms_bins.append(holder)
-    holder=[]
-    rr.clear_window()
-    rr.reset()
+# rr = Radar_Resp_NPI()
+# lms_bins = []
+# for i in range(5):
+#     holder = []
+#     for val in filtered_integrated_bins[i]:
+#         rr.add_data(val)
+#         holder.append(rr.get_sub_point())
+#     lms_bins.append(holder)
+#     holder=[]
+#     rr.clear_window()
+#     rr.reset()
 
 # integrated_lms_bins = []
 # for i in range(5):
@@ -428,7 +430,7 @@ for i in range(4):
     axes[i].plot(time_axis,filtered_integrated_bins[i], label='displacement .15hz hp velocity', color='red', linewidth=1)
     # axes[i].plot(time_axis,integrated_window_mean_bins[i], label='displacement win mean velocity', color='blue', linewidth=1)
     # axes[i].plot(time_axis,integrated_lms_bins[i], label='displacement lms velocity', color='green', linewidth=1)
-    axes[i].plot(time_axis,lms_bins[i], label='lms filtered displacement', color='green', linewidth=1)
+    # axes[i].plot(time_axis,lms_bins[i], label='lms filtered displacement', color='green', linewidth=1)
     axes[i].grid()
     axes[i].legend(loc='upper right')
 axes[4].set_title('Bins 1-4', fontsize=16)
@@ -437,7 +439,7 @@ axes[4].plot(time_axis,integrated_bins[4], label='raw displacement', color='blac
 axes[4].plot(time_axis,filtered_integrated_bins[4], label='displacement .15hz hp velocity', color='red', linewidth=1)
 # axes[4].plot(time_axis,integrated_window_mean_bins[4], label='displacement win mean velocity', color='blue', linewidth=1)
 # axes[4].plot(time_axis,integrated_lms_bins[4], label='displacement lms velocity', color='green', linewidth=1)
-axes[4].plot(time_axis,lms_bins[4], label='lms filtered displacement', color='green', linewidth=1)
+# axes[4].plot(time_axis,lms_bins[4], label='lms filtered displacement', color='green', linewidth=1)
 axes[4].grid()
 axes[4].legend(loc='upper right')
 

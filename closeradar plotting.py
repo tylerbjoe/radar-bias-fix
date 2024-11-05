@@ -83,6 +83,7 @@ class Radar_Resp_NPI():
         
     def reset_sample_n(self):
         self.sample_n = 0;
+        self.intercept = 0;
 
     def start(self):
         self.running = True
@@ -168,6 +169,7 @@ class Radar_Resp_LMS():
     
     def reset_sample_n(self):
         self.sample_n = 0;
+        self.intercept = 0;
     
     def clear_window(self):
         self.window = np.zeros(self.win_size)
@@ -270,13 +272,13 @@ fig.suptitle(title, fontsize=20, fontweight='bold')
 for i in range(4):
     axes[i].set_title(f'Bin {i+1}', fontsize=16)
     # axes[i].plot(time_axis,bins[i], label='raw velocity', color='black', linewidth=3)
-    # # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
-    # # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+    # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
     # axes[i].set_ylabel('Velocity')
     
     axes[i].plot(time_axis,integrated_bins[i], label='raw displacement', color='black', linewidth=3)
-    # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
-    # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+    axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+    axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
     axes[i].set_ylabel('Displacement (unitless)')
     
     axes[i].grid()
@@ -286,10 +288,10 @@ for i in range(4):
 
 # 5th subplot: integrated bins 1-4
 axes[4].set_title('Integrated 1-4', fontsize=16)
-integrated_plot_sig = np.array(integrated_bins[4]) / 4
+integrated_plot_sig = np.array(integrated_bins[4])/4
 axes[4].plot(time_axis,integrated_plot_sig, label='raw displacement', color='black', linewidth=3)
-# axes[4].plot(time_axis,npi_sig[4], label="Detrended NPI", color='blue')
-# axes[4].plot(time_axis,lms_sig[4], label="Detrended LMS", color='darkorange')
+axes[4].plot(time_axis,np.array(npi_sig[4])/4, label="Detrended NPI", color='blue')
+axes[4].plot(time_axis,np.array(lms_sig[4])/4, label="Detrended LMS", color='darkorange')
 axes[4].set_xlabel('Time (s)')
 axes[4].set_ylabel('Displacement (unitless)')
 axes[4].legend()
@@ -305,24 +307,24 @@ plt.show()
 
 
 #%% plot the 6 bins
-time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
-# Create subplots
-fig, axes = plt.subplots(6, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
-fig.suptitle(title, fontsize=20, fontweight='bold')
-for i in range(6):
-    axes[i].set_title(f'Bin {i}', fontsize=16)
-    # axes[i].plot(time_axis,bins[i], label='raw velocity', color='black', linewidth=3)
-    # # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
-    # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
-    axes[i].set_ylabel('Velocity')
+# time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
+# # Create subplots
+# fig, axes = plt.subplots(6, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+# fig.suptitle(title, fontsize=20, fontweight='bold')
+# for i in range(6):
+#     axes[i].set_title(f'Bin {i}', fontsize=16)
+#     # axes[i].plot(time_axis,bins[i], label='raw velocity', color='black', linewidth=3)
+#     # # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+#     # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+#     axes[i].set_ylabel('Velocity')
     
-    axes[i].plot(time_axis,bins[i], label='raw displacement', color='black', linewidth=3)
-    # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
-    # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
-    # axes[i].set_ylabel('Displacement (unitless)')
+#     axes[i].plot(time_axis,bins[i], label='raw displacement', color='black', linewidth=3)
+#     # axes[i].plot(time_axis,npi_sig[i], label="Detrended NPI", color='blue')
+#     # axes[i].plot(time_axis,lms_sig[i], label="Detrended LMS", color='darkorange')
+#     # axes[i].set_ylabel('Displacement (unitless)')
     
-    axes[i].grid()
-    axes[i].legend()
+#     axes[i].grid()
+#     axes[i].legend()
 
 #%% different combinations of bins integrated
 # time_axis = np.arange(len(integrated_bins[1])) / 30  # Time in seconds
