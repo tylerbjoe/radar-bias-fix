@@ -41,6 +41,15 @@ class Radar_Resp_NPI():
     def get_slope(self):
         return self.slope
     
+    def set_linear(self):
+        dur = len(self.window)
+        x = np.linspace(0, dur/30, dur)
+        self.intercept = self.linear_point
+        self.slope, intercept, r, p, std_err = stats.linregress(x, self.window)
+        if self.intercept == 0:
+            self.intercept = intercept
+        self.lin_model = self.slope * x + self.intercept
+    
     def set_sub_point(self, value):
         self.sub_point = value
 
@@ -68,7 +77,7 @@ class Radar_Resp_NPI():
             x = self.sample_n - (self.win_size - last_peaks[-1])
             y = self.window[last_peaks[-1]]
             self.all_peaks.append(x)
-            if x != self.lastnpeak[0]:# and abs(x-self.lastnpeak[0]) >= 2.25 * self.fs:
+            if x != self.lastnpeak[0] and abs(x-self.lastnpeak[0]) >= 2.25 * self.fs:
                 # if self.lastnpeak != [0,0]:
                 slope = (y-self.lastnpeak[1])/(x-self.lastnpeak[0])
                 self.lastnpeak=[x,y]
@@ -128,51 +137,37 @@ def get_summation(biny):
        total_bin.append(total)
     return total_bin
 
-#%% CSVS 
-title = "Bins 1-4 fast_breathing3 radar 1"
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Pneumo.csv"
-sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
-truth = [int(x) for x in sigs]
+#%% CSVS
+# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Pneumo.csv"
+# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+# truth = [int(x) for x in sigs][:15000]
 
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Radar_2.csv"
-sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
-sig = [float(x) for x in sigs]
-sig=np.array(sig)
-
-#%% SIGNAL PROCESSING
-
-
-
-
-
-
-
-
-
-
-
+# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Radar_2.csv"
+# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
+# sig = [float(x) for x in sigs]
+# sig=np.array(sig)
 
 
 #%% JSONS
-# title = "Bins 1-4 fast_breathing3 radar 1"
-# # "C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\fast_breathing\fast_breathing3\Radar_1_metadata_1730403060.3604577.json"
-# with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\Top_of_Breath\ToB2\Radar_1_metadata_1730402495.8949175.json", 'r') as file:
-#     json_data = json.load(file)
-# bins = []
-# df = pd.DataFrame(json_data)
-# for i in range(6):
-#     tmp_b, tmp_a = [], []
-#     for j in range(1, len(df["frame_data"])):
-#         tmp_b.append(df["frame_data"][j][i])
-#     bins.append(tmp_b)
-# biny = [sum(values) for values in zip(bins[1],bins[2],bins[3],bins[4])]
-# integrated_bins = []
+title = "Bins 1-4 fast_breathing3 radar 1"
+# "C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\fast_breathing\fast_breathing3\Radar_1_metadata_1730403060.3604577.json"
+with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\close_range_testing_10_31\super_close_10_31\Top_of_Breath\ToB2\Radar_1_metadata_1730402495.8949175.json", 'r') as file:
+    json_data = json.load(file)
+bins = []
+df = pd.DataFrame(json_data)
+for i in range(6):
+    tmp_b, tmp_a = [], []
+    for j in range(1, len(df["frame_data"])):
+        tmp_b.append(df["frame_data"][j][i])
+    bins.append(tmp_b)
+biny = [sum(values) for values in zip(bins[1],bins[2],bins[3],bins[4])]
+integrated_bins = []
 
-# for i in range(1,5):
-#     integrated_bins.append(get_summation(bins[i]))
-# integrated_bins.append(get_summation(biny))
+for i in range(1,5):
+    integrated_bins.append(get_summation(bins[i]))
+integrated_bins.append(get_summation(biny))
 
-# binss = [bins[1],bins[2],bins[3],bins[4],biny]
+binss = [bins[1],bins[2],bins[3],bins[4],biny]
 #%% SIGNAL PROCESSING 
 rr = Radar_Resp_NPI()
 npi_bins = []
@@ -243,6 +238,50 @@ axes[4].legend(loc='upper right')
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# time_axis = np.arange(len(integrated_bins[1])) / 30  # Time in seconds
+# # Create subplots
+# fig, axes = plt.subplots(5, 1, figsize=(10, 8), sharex=True, sharey=True)  # 2 rows, 1 column
+# fig.suptitle(title, fontsize=20, fontweight='bold')
+# for i in range(4):
+#     axes[i].set_title(f'Bin {i+1}', fontsize=16)
+
+#     axes[i].plot(time_axis,integrated_bins[i], label='raw displacement', color='black', linewidth=3)
+#     axes[i].set_ylabel('Displacement (unitless)')
+    
+#     axes[i].grid()
+#     axes[i].legend()
+    
+
+
+# # 5th subplot: integrated bins 1-4
+# axes[4].set_title('Integrated 1-4', fontsize=16)
+# integrated_plot_sig = np.array(integrated_bins[4]) / 4
+# axes[4].plot(time_axis,integrated_plot_sig, label='raw displacement', color='black', linewidth=3)
+# axes[4].set_xlabel('Time (s)')
+# axes[4].set_ylabel('Displacement (unitless)')
+# axes[4].legend()
+# axes[4].grid()
+
+
+# plt.tight_layout()  # Adjust layout for better spacing
+# output_folder = r"C:\Users\TJoe\Documents\Radar Offset Fix\close range testing plots"
+# output_path = os.path.join(output_folder, f"{title}.png")
+# plt.show()
 
 
 

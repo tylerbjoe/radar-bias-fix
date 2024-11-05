@@ -362,7 +362,7 @@ binss = [bins[1],bins[2],bins[3],bins[4],biny]
 #%% SIGNAL PROCESSING 
 filtered_bins = []
 for b in binss:
-    filtered_bins.append(butterworth_filter(np.array(b), fs=30, n_ord=2, low_cut=.15))
+    filtered_bins.append(butterworth_filter(np.array(b), fs=30, n_ord=2, low_cut=0.15, high_cut=0.6))
 
 filtered_integrated_bins = []
 for i in range(5):
@@ -427,7 +427,7 @@ for i in range(4):
     axes[i].set_title(f'Bin {i + 1}', fontsize=16)
     axes[i].set_ylabel('Displacement')
     axes[i].plot(time_axis,integrated_bins[i], label='raw displacement', color='black', linewidth=3)
-    axes[i].plot(time_axis,filtered_integrated_bins[i], label='displacement .15hz hp velocity', color='red', linewidth=1)
+    axes[i].plot(time_axis,filtered_integrated_bins[i], label='filtered', color='red', linewidth=1)
     # axes[i].plot(time_axis,integrated_window_mean_bins[i], label='displacement win mean velocity', color='blue', linewidth=1)
     # axes[i].plot(time_axis,integrated_lms_bins[i], label='displacement lms velocity', color='green', linewidth=1)
     # axes[i].plot(time_axis,lms_bins[i], label='lms filtered displacement', color='green', linewidth=1)
@@ -436,7 +436,7 @@ for i in range(4):
 axes[4].set_title('Bins 1-4', fontsize=16)
 axes[4].set_ylabel('Displacement')
 axes[4].plot(time_axis,integrated_bins[4], label='raw displacement', color='black', linewidth=3)
-axes[4].plot(time_axis,filtered_integrated_bins[4], label='displacement .15hz hp velocity', color='red', linewidth=1)
+axes[4].plot(time_axis,filtered_integrated_bins[4], label='filtered', color='red', linewidth=1)
 # axes[4].plot(time_axis,integrated_window_mean_bins[4], label='displacement win mean velocity', color='blue', linewidth=1)
 # axes[4].plot(time_axis,integrated_lms_bins[4], label='displacement lms velocity', color='green', linewidth=1)
 # axes[4].plot(time_axis,lms_bins[4], label='lms filtered displacement', color='green', linewidth=1)
@@ -444,7 +444,43 @@ axes[4].grid()
 axes[4].legend(loc='upper right')
 
 
+#%% FFT plots of each velocity signal
 
+frequencies = np.fft.fftfreq(len(binss[0]), 1 / 30)
+fig, axes = plt.subplots(5, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+fig.suptitle("FFT" + title, fontsize=20, fontweight='bold')
+for i in range(4):
+    signal_fft = np.fft.fft(binss[i])
+    positive_frequencies = frequencies[:len(frequencies) // 2]
+    magnitude = np.abs(signal_fft[:len(signal_fft) // 2])
+    axes[i].plot(positive_frequencies, magnitude, color = 'blue')
+    
+    # signal_fft = np.fft.fft(filtered_bins[i])
+    # positive_frequencies = frequencies[:len(frequencies) // 2]
+    # magnitude = np.abs(signal_fft[:len(signal_fft) // 2])
+    # axes[i].plot(positive_frequencies, magnitude, color = 'orange')
+    
+    axes[i].set_title(f'Bin {i + 1}', fontsize=16)
+    axes[i].set_ylabel("Magnitude")
+    axes[i].grid()
+    
+
+signal_fft = np.fft.fft(binss[4])
+# Only plot the positive frequencies and their magnitudes
+positive_frequencies = frequencies[:len(frequencies) // 2]
+magnitude = np.abs(signal_fft[:len(signal_fft) // 2])
+axes[4].plot(positive_frequencies, magnitude, color = 'blue')
+
+# signal_fft = np.fft.fft(filtered_bins[4])
+# positive_frequencies = frequencies[:len(frequencies) // 2]
+# magnitude = np.abs(signal_fft[:len(signal_fft) // 2])
+# axes[4].plot(positive_frequencies, magnitude, color = 'orange')
+
+axes[4].set_title(f'Bin {i + 1}', fontsize=16)
+axes[4].set_ylabel("Magnitude")
+    
+axes[4].set_xlabel("Frequency (Hz)")
+axes[4].grid()
 
 
 
