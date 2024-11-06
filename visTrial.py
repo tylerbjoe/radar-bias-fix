@@ -13,8 +13,6 @@ from scipy.signal import find_peaks
 from scipy.interpolate import interp1d
 
 
-
-
 # windowing function takes array and returns array of arrays containing windows
 def get_windows(signal, window_len=10, overlap=2, fz=30):
     windows = []
@@ -36,7 +34,7 @@ def get_linear(signal):
     return slope * x + intercept
    
 def get_peakline(signal):
-    last_peaks = find_peaks(-signal, prominence=250)[0]#1650 for breathold  distance=2.5*30,
+    last_peaks = find_peaks(-signal, prominence=550)[0]#1650 for breathold  distance=2.5*30,
     # x1 = last_peaks[-2]
     # y1 = signal[x1]
     # x2 = last_peaks[-1]
@@ -48,32 +46,32 @@ def get_peakline(signal):
         return 0
 
 #%% JSONS
-with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
-    json_data = json.load(file)
+# with open(r"C:\Users\TJoe\Documents\Radar Offset Fix\testing_10_22 1\testing_10_22\inhale_hold\Radar_1_metadata_1729626016.450956.json", 'r') as file:
+#     json_data = json.load(file)
 
-bins = []
+# bins = []
 
-df = pd.DataFrame(json_data)
-for i in range(6):
-    tmp_b, tmp_a = [], []
-    for j in range(1, len(df["frame_data"])):
-        tmp_b.append(df["frame_data"][j][i])
-    bins.append(tmp_b)
+# df = pd.DataFrame(json_data)
+# for i in range(6):
+#     tmp_b, tmp_a = [], []
+#     for j in range(1, len(df["frame_data"])):
+#         tmp_b.append(df["frame_data"][j][i])
+#     bins.append(tmp_b)
 
-biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
-sig = integrate.cumulative_trapezoid(biny)
+# biny = [sum(values) for values in zip(bins[0],bins[1],bins[2],bins[3],bins[4],bins[5])]
+# sig = integrate.cumulative_trapezoid(biny)
 #%% CSVS
-# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Pneumo.csv"
-# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
-# truth = [int(x) for x in sigs][:15000]
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Pneumo.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+truth = [int(x) for x in sigs]
 
-# file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data\Radar_Pneumo Data\Subject_2\Radar_2.csv"
-# sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:][:15000]
-# sig = [float(x) for x in sigs]
-# sig = np.array(sig)
-
-# # script to run
-# fs = 18
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Radar_2.csv"
+sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
+sig = [float(x) for x in sigs]
+sig = np.array(sig)
+sig = sig[:len(truth)]
+# script to run
+fs = 18
 
 #%% WINDOWING
 windows = get_windows(sig)
@@ -84,18 +82,18 @@ time=[]
 for win in windows:
     for val in win:
         window.append(val)
-    plt.figure()
-    plt.plot(win, color='blue')
+    # plt.figure()
+    # plt.plot(win, color='blue')
     # lin_win = get_linear(win)
     # for l in lin_win:
         #lin.append(l)
     lin = get_peakline(win)
     times = (np.arange(start=len(time), stop=len(win))/30)
-    if type(lin) != int:
-        for l in lin:
-            plt.scatter(l,win[l], color='orange')
-    else:
-        plt.scatter(lin,win[lin], color='orange')
+    # if type(lin) != int:
+    #     for l in lin:
+    #         plt.scatter(l,win[l], color='orange')
+    # else:
+    #     plt.scatter(lin,win[lin], color='orange')
     for t in times:
         time.append(t)
     lin = 0
@@ -105,14 +103,13 @@ for win in windows:
 #     i+=1
 
 #%% SIGNAL PROCESSING
-# peaks = get_peakline(-sig)
-# time = np.array(time)
-# sig = np.array(sig)
+peaks = get_peakline(sig)
+sig = np.array(sig)
 
-# negative_peak_values = sig[peaks]
+negative_peak_values = sig[peaks]
 
-# interpolator = interp1d(peaks, negative_peak_values, kind='linear', fill_value="extrapolate")
-# interpolated_signal = interpolator(np.arange(len(sig)))#[peaks[0]:peaks[-1]])))
+interpolator = interp1d(peaks, negative_peak_values, kind='linear', fill_value="extrapolate")
+interpolated_signal = interpolator(np.arange(len(sig)))#[peaks[0]:peaks[-1]])))
 
 #%% PLOTTING SINGLE
 # fs=18
@@ -133,31 +130,31 @@ for win in windows:
 # plt.show()
    
 #%% SUBPLOTS W TRUTH
-# time_axis = time
-# # Create subplots
-# fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+time_axis = np.arange(len(sig)) / 30
+# Create subplots
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
 
-# # First subplot: Signal and Linear Model
+# First subplot: Signal and Linear Model
 # axes[0].plot(time_axis,sig, label='Signal', color='blue')#time_axis, 
 # axes[0].plot(time_axis,interpolated_signal, label='Interpolated Negative Peaks', linestyle='--', color='orange')
-# axes[0].plot(time_axis,sig-interpolated_signal, label='detrended signal', color='red')
+axes[0].plot(time_axis,sig-interpolated_signal, label='detrended signal', color='red')
 
-# axes[0].set_ylabel('Displacement (unitless)')
-# axes[0].legend()
-# axes[0].grid()
-# axes[0].set_title('Radar', fontsize=16)
+axes[0].set_ylabel('Displacement (unitless)')
+axes[0].legend()
+axes[0].grid()
+axes[0].set_title('Radar', fontsize=16)
 
-# # Second subplot: Correlation
-# # axes[1].plot(time_axis, corr, label='Correlation', color='green')
-# axes[1].plot(time_axis,truth, label='Pneum', color='black')
-# axes[1].set_xlabel('Time')
-# axes[1].set_ylabel('Displacement (unitless)')
-# axes[1].legend()
-# axes[1].grid()
-# axes[1].set_title('Pneum', fontsize=16)
+# Second subplot: Correlation
+# axes[1].plot(time_axis, corr, label='Correlation', color='green')
+axes[1].plot(time_axis,truth, label='Pneum', color='black')
+axes[1].set_xlabel('Time')
+axes[1].set_ylabel('Displacement (unitless)')
+axes[1].legend()
+axes[1].grid()
+axes[1].set_title('Pneum', fontsize=16)
 
-# plt.tight_layout()  # Adjust layout for better spacing
-# plt.show()
+plt.tight_layout()  # Adjust layout for better spacing
+plt.show()
    
    
    

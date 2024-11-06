@@ -63,7 +63,7 @@ class Radar_Resp_NPI():
         self.set_sub_point(self.window[-1] - self.model_point)
         
     def check_new_peak(self):
-        last_peaks = find_peaks(np.negative(self.window), prominence=150)[0]#1650 prominence when breathold #150 or 250 for other??? distance=2*30,, prominence=250
+        last_peaks = find_peaks(np.negative(self.window), prominence=250)[0]#1650 prominence when breathold #150 or 250 for other??? distance=2*30,, prominence=250
         if len(last_peaks) != 0:
             x = self.sample_n - (self.win_size - last_peaks[-1])
             y = self.window[last_peaks[-1]]
@@ -72,7 +72,7 @@ class Radar_Resp_NPI():
                 # if self.lastnpeak != [0,0]:
                 slope = (y-self.lastnpeak[1])/(x-self.lastnpeak[0])
                 self.lastnpeak=[x,y]
-                if abs(slope) <= 29 or self.lastnpeak == [0,0]:#<+29 or 20
+                if abs(slope) <= 20 or self.lastnpeak == [0,0]:#<+29 or 20
                     self.slope = slope
                     self.set_intercept(self.model_point)
                     # self.lastnpeak=[x,y]
@@ -113,6 +113,95 @@ class Radar_Resp_NPI():
         self.running = False
     '''' End Class '''
     
+#%% LMS Alg
+class Radar_Resp_LMS():
+    '''' Begin Class '''
+    def __init__(self):
+        self.fs = 30                    # frequency (Hz)
+        
+        self.win_size = 12 * self.fs     # window size (s)
+        self.check_corr = 0.3 * self.fs   # rate to check if model still correlates to signal (s)
+        self.corr_threshold = 0.7       # correlation threshold to refresh model
+        self.window = np.zeros(self.win_size)              # empty window
+        
+        self.running = False            # whether or not running
+        self.lin_model = []             # empty linear model
+        self.sub_point = 0              # signal point with model subtracted
+        self.linear_point = 0
+        self.correlation = 0            # correlation metric (pearsonr)
+        self.sample_n = 0               # number of samples processed
+        self.slope = 0                  # slope of model
+        self.intercept = 0              # intercept of model
+        self.lasty = 0
+        self.streak = 0
+
+    def get_sub_point(self): # USE THIS TO GET A DETRENDED POINT BACK
+        return self.sub_point
+    
+    def set_sub_point(self):
+        self.set_linear_point()
+        self.sub_point =  self.window[-1] - self.linear_point
+
+    def set_correlation(self):
+        self.correlation,_ = pearsonr(self.window, (self.lin_model))
+        
+    def get_correlation(self):
+        return self.correlation
+    
+    def add_data(self, value): # USE THIS TO ADD A DATA POINT
+        self.sample_n += 1
+        self.window = np.roll(self.window, -1)
+        self.window[-1] = value
+        if self.sample_n >= self.win_size:
+            if self.sample_n != self.win_size:
+                self.set_correlation()
+            if (self.sample_n % self.check_corr == 0 and self.correlation<self.corr_threshold) or (self.win_size == self.sample_n):
+                self.set_linear() # make new model if correlation too off and every x seconds
+                self.streak = 0
+            self.streak+=1
+            self.set_sub_point()
+        
+    def set_linear(self):
+        dur = len(self.window)
+        x = np.linspace(0, dur/30, dur)
+        self.intercept = self.linear_point
+        self.slope, intercept, r, p, std_err = stats.linregress(x, self.window)
+        if self.intercept == 0:
+            self.intercept = intercept
+        self.lin_model = self.slope * x + self.intercept
+        
+    def set_linear_point(self):
+        if self.sample_n == self.win_size:
+            self.linear_point = self.slope * (self.sample_n / self.fs) + self.intercept
+            self.intercept = self.linear_point
+        else:
+            self.linear_point = self.slope * (self.streak / self.fs) + self.intercept
+        
+    def get_linear_point(self):
+        return self.linear_point
+    
+    def reset_sample_n(self):
+        self.sample_n = 0;
+    
+    def clear_window(self):
+        self.window = np.zeros(self.win_size)
+    
+    def start(self):
+        self.running = True
+        Thread(target=self._run, daemon=True).start()
+    
+    def _run(self):
+        try:
+            while self.running:
+                print(f"{self.sub_point} Linear subtracted point")
+                time.sleep(1/30000)
+        except:
+            self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
+
+    def stop(self):
+        self.running = False
+    '''' End Class '''
+    
 #%% Load Data Imports
 import json
 import pandas as pd
@@ -130,23 +219,69 @@ def get_summation(biny):
 
 #%% CSVS 
 title = "Bins 1-4 fast_breathing3 radar 1"
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Pneumo.csv"
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_6\Pneumo.csv"
 sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
 truth = [int(x) for x in sigs]
 
-file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_9_quest\Radar_2.csv"
+file_path = r"C:\Users\TJoe\Documents\Radar Offset Fix\Radar_Pneumo Data 1\Radar_Pneumo Data\Subject_6\Radar_2.csv"
 sigs = pd.read_csv(file_path, usecols=[0], header=None).squeeze().tolist()[1:]
 sig = [float(x) for x in sigs]
 sig=np.array(sig)
-
+sig = sig[:len(truth)]
+truth = truth[:len(sig)]
 #%% SIGNAL PROCESSING
+lms_npi_sig = []
+npi_sig=[]
+lms_sig = []
+npi_mod = []
+dnpi_sig=[]
+rr_lms = Radar_Resp_LMS()
+rr_lnpi = Radar_Resp_NPI()
+rr_npi = Radar_Resp_NPI()
+rr_dnpi = Radar_Resp_NPI()
+for val in sig:
+    rr_lms.add_data(val)
+    lms_sig.append(rr_lms.get_sub_point())
+    
+    rr_npi.add_data(val)
+    npi_sig.append(rr_npi.get_sub_point())
+    
+    rr_lnpi.add_data(rr_lms.get_sub_point())
+    lms_npi_sig.append(rr_lnpi.get_sub_point())
+    
+    rr_dnpi.add_data(rr_npi.get_sub_point())
+    dnpi_sig.append(rr_dnpi.get_sub_point())
+#     npi_mod.append(rr_lms.get_model_point())
+# all_peaks = rr_lms.get_all_peaks()
+# used_peaks = rr_lms.get_npeaks()
 
+#%% Plotting
+time_axis = np.arange(len(sig)) / 30  # Time in seconds
 
+# Create subplots
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+fig.suptitle(title, fontsize=20, fontweight='bold')
 
+axes[0].set_title('Radar', fontsize=16)
+axes[0].set_ylabel('Displacement')
+# axes[0].plot(time_axis,sig, label='raw displacement', color='grey', linewidth=1)
+# axes[0].scatter([time_axis[idx] for idx in all_peaks],[sig[idx] for idx in all_peaks], label='negative peaks', color='green')
+# axes[0].scatter([time_axis[idx] for idx in used_peaks],[sig[idx] for idx in used_peaks], label='used negative peaks', color='orange')
+# axes[0].plot(time_axis,npi_mod, label='npi model', color='orange', linewidth=1)
+axes[0].plot(time_axis,npi_sig, label='displacement npi', color='blue', linewidth=1)
+axes[0].plot(time_axis,lms_sig, label='displacement lms', color='red', linewidth=1)
+axes[0].plot(time_axis,lms_npi_sig, label='displacement lms>npi', color='purple', linewidth=1)
+axes[0].plot(time_axis,dnpi_sig, label='displacement npi>npi', color='magenta', linewidth=1)
 
-
-
-
+axes[0].grid()
+axes[0].legend(loc='upper right')
+    
+axes[1].set_title('Pneum', fontsize=16)
+axes[1].set_ylabel('Displacement')
+axes[1].plot(time_axis,truth, label='pneum', color='black', linewidth=3)
+axes[1].set_xlabel('Time (s)')
+axes[1].grid()
+axes[1].legend(loc='upper right')
 
 
 
@@ -173,52 +308,52 @@ sig=np.array(sig)
 # integrated_bins.append(get_summation(biny))
 
 # binss = [bins[1],bins[2],bins[3],bins[4],biny]
-#%% SIGNAL PROCESSING 
-rr = Radar_Resp_NPI()
-npi_bins = []
-peak_bins = []
-model_bins = []
-all_peak_bins = []
-for i in range(5):
-    holder = []
-    mholder = []
-    for val in integrated_bins[i]:
-        rr.add_data(val)
-        holder.append(rr.get_sub_point())
-        mholder.append(rr.get_model_point())
-    npi_bins.append(holder)
-    model_bins.append(mholder)
-    all_peak_bins.append(rr.get_all_peaks())
-    peak_bins.append(rr.get_npeaks())
-    holder=[]
-    mholder=[]
-    rr.reset()
+# #%% SIGNAL PROCESSING 
+# rr = Radar_Resp_NPI()
+# npi_bins = []
+# peak_bins = []
+# model_bins = []
+# all_peak_bins = []
+# for i in range(5):
+#     holder = []
+#     mholder = []
+#     for val in integrated_bins[i]:
+#         rr.add_data(val)
+#         holder.append(rr.get_sub_point())
+#         mholder.append(rr.get_model_point())
+#     npi_bins.append(holder)
+#     model_bins.append(mholder)
+#     all_peak_bins.append(rr.get_all_peaks())
+#     peak_bins.append(rr.get_npeaks())
+#     holder=[]
+#     mholder=[]
+#     rr.reset()
 
-#%% Plot displacements
+# #%% Plot displacements
 
-time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
-# Create subplots
-fig, axes = plt.subplots(5, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
-fig.suptitle(title, fontsize=20, fontweight='bold')
-for i in range(4):
-    axes[i].set_title(f'Bin {i + 1}', fontsize=16)
-    axes[i].set_ylabel('Displacement')
-    axes[i].plot(time_axis,integrated_bins[i], label='raw displacement', color='black', linewidth=3)
-    axes[i].scatter([time_axis[idx] for idx in all_peak_bins[i]],[integrated_bins[i][idx] for idx in all_peak_bins[i]], label='negative peaks', color='blue')
-    axes[i].scatter([time_axis[idx] for idx in peak_bins[i]],[integrated_bins[i][idx] for idx in peak_bins[i]], label='used negative peaks', color='orange')
-    axes[i].plot(time_axis,model_bins[i], label='npi model', color='darkorange', linewidth=1)
-    axes[i].plot(time_axis,npi_bins[i], label='displacement npi', color='red', linewidth=1)
-    axes[i].grid()
-    axes[i].legend(loc='upper right')
-axes[4].set_title('Bins 1-4', fontsize=16)
-axes[4].set_ylabel('Displacement')
-axes[4].plot(time_axis,integrated_bins[4], label='raw displacement', color='black', linewidth=3)
-axes[4].scatter([time_axis[idx] for idx in all_peak_bins[4]],[integrated_bins[4][idx] for idx in all_peak_bins[4]], label='negative peaks', color='blue')
-axes[4].scatter([time_axis[idx] for idx in peak_bins[4]],[integrated_bins[4][idx] for idx in peak_bins[4]], label='used negative peaks', color='orange')
-axes[4].plot(time_axis,model_bins[4], label='npi model', color='darkorange', linewidth=1)
-axes[4].plot(time_axis,npi_bins[4], label='displacement npi', color='red', linewidth=1)
-axes[4].grid()
-axes[4].legend(loc='upper right')
+# time_axis = np.arange(len(bins[1])) / 30  # Time in seconds
+# # Create subplots
+# fig, axes = plt.subplots(5, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+# fig.suptitle(title, fontsize=20, fontweight='bold')
+# for i in range(4):
+#     axes[i].set_title(f'Bin {i + 1}', fontsize=16)
+#     axes[i].set_ylabel('Displacement')
+#     axes[i].plot(time_axis,integrated_bins[i], label='raw displacement', color='black', linewidth=3)
+#     axes[i].scatter([time_axis[idx] for idx in all_peak_bins[i]],[integrated_bins[i][idx] for idx in all_peak_bins[i]], label='negative peaks', color='blue')
+#     axes[i].scatter([time_axis[idx] for idx in peak_bins[i]],[integrated_bins[i][idx] for idx in peak_bins[i]], label='used negative peaks', color='orange')
+#     axes[i].plot(time_axis,model_bins[i], label='npi model', color='darkorange', linewidth=1)
+#     axes[i].plot(time_axis,npi_bins[i], label='displacement npi', color='red', linewidth=1)
+#     axes[i].grid()
+#     axes[i].legend(loc='upper right')
+# axes[4].set_title('Bins 1-4', fontsize=16)
+# axes[4].set_ylabel('Displacement')
+# axes[4].plot(time_axis,integrated_bins[4], label='raw displacement', color='black', linewidth=3)
+# axes[4].scatter([time_axis[idx] for idx in all_peak_bins[4]],[integrated_bins[4][idx] for idx in all_peak_bins[4]], label='negative peaks', color='blue')
+# axes[4].scatter([time_axis[idx] for idx in peak_bins[4]],[integrated_bins[4][idx] for idx in peak_bins[4]], label='used negative peaks', color='orange')
+# axes[4].plot(time_axis,model_bins[4], label='npi model', color='darkorange', linewidth=1)
+# axes[4].plot(time_axis,npi_bins[4], label='displacement npi', color='red', linewidth=1)
+# axes[4].grid()
+# axes[4].legend(loc='upper right')
 
 
 
