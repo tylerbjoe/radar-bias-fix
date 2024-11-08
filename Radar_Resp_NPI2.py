@@ -152,32 +152,59 @@ all_peaks = rr.get_all_peaks()
 used_peaks = rr.get_npeaks()
 
 #%% Plotting
+# time_axis = np.arange(len(sig)) / 30  # Time in seconds
+# time_axis_npi = np.arange(len(npi_sig)) / 30  # Time in seconds
+# time_axis_truth = np.arange(len(truth)) / 30  # Time in seconds
+# # Create subplots
+# fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+# fig.suptitle(title, fontsize=20, fontweight='bold')
+
+# axes[0].set_title('Radar', fontsize=16)
+# axes[0].set_ylabel('Displacement')
+# # axes[0].plot(time_axis,sig, label='raw displacement', color='blue', linewidth=3)
+# # axes[0].scatter([time_axis[idx] for idx in all_peaks],[sig[idx] for idx in all_peaks], label='negative peaks', color='green')
+# # axes[0].scatter([time_axis[idx] for idx in used_peaks],[sig[idx] for idx in used_peaks], label='used negative peaks', color='orange')
+# # axes[0].plot(time_axis_npi,npi_mod, label='npi model', color='orange', linewidth=1)
+# axes[0].plot(time_axis_npi,npi_sig, label='displacement npi', color='red', linewidth=1)
+# axes[0].grid()
+# axes[0].legend(loc='upper right')
+    
+# axes[1].set_title('Pneum', fontsize=16)
+# axes[1].set_ylabel('Displacement')
+# axes[1].plot(time_axis_truth,truth, label='pneum', color='black', linewidth=1)
+# axes[1].set_xlabel('Time (s)')
+# axes[1].grid()
+# axes[1].legend(loc='upper right')
+
+#%% Sep plots
 time_axis = np.arange(len(sig)) / 30  # Time in seconds
-time_axis_npi = np.arange(len(npi_sig)) / 30  # Time in seconds
-time_axis_truth = np.arange(len(truth)) / 30  # Time in seconds
+
 # Create subplots
-fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+fig, axes = plt.subplots(3, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
 fig.suptitle(title, fontsize=20, fontweight='bold')
 
 axes[0].set_title('Radar', fontsize=16)
 axes[0].set_ylabel('Displacement')
-# axes[0].plot(time_axis,sig, label='raw displacement', color='blue', linewidth=3)
-# axes[0].scatter([time_axis[idx] for idx in all_peaks],[sig[idx] for idx in all_peaks], label='negative peaks', color='green')
-# axes[0].scatter([time_axis[idx] for idx in used_peaks],[sig[idx] for idx in used_peaks], label='used negative peaks', color='orange')
-# axes[0].plot(time_axis_npi,npi_mod, label='npi model', color='orange', linewidth=1)
-axes[0].plot(time_axis_npi,npi_sig, label='displacement npi', color='red', linewidth=1)
+axes[0].plot(time_axis,sig, label='raw displacement', color='blue', linewidth=3)
+axes[0].scatter([time_axis[idx] for idx in all_peaks],[sig[idx] for idx in all_peaks], label='negative peaks', color='green')
+axes[0].scatter([time_axis[idx] for idx in used_peaks],[sig[idx] for idx in used_peaks], label='used negative peaks', color='orange')
+axes[0].plot(time_axis,npi_mod, label='npi model', color='orange', linewidth=1)
 axes[0].grid()
 axes[0].legend(loc='upper right')
-    
-axes[1].set_title('Pneum', fontsize=16)
+
+
+axes[1].set_title('Detrended', fontsize=16)
 axes[1].set_ylabel('Displacement')
-axes[1].plot(time_axis_truth,truth, label='pneum', color='black', linewidth=1)
-axes[1].set_xlabel('Time (s)')
+axes[1].plot(time_axis,npi_sig, label='npi displacement', color='red', linewidth=1)
 axes[1].grid()
 axes[1].legend(loc='upper right')
-
-
-
+    
+axes[2].set_title('Pneum', fontsize=16)
+axes[2].set_ylabel('Displacement')
+axes[2].plot(time_axis,truth, label='pneum', color='black', linewidth=1)
+axes[2].set_xlabel('Time (s)')
+axes[2].grid()
+axes[2].legend(loc='upper right')
 
 
 

@@ -105,7 +105,7 @@ class Radar_Resp_NPI():
         try:
             while self.running:
                 print(f"{self.sub_point} Linear subtracted point")
-                time.sleep(1/300000)
+                # time.sleep(1/300000)
         except:
             self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
 
@@ -134,16 +134,21 @@ class Radar_Resp_LMS():
         self.intercept = 0              # intercept of model
         self.lasty = 0
         self.streak = 0
+        self.ttime = 0
 
     def get_sub_point(self): # USE THIS TO GET A DETRENDED POINT BACK
         return self.sub_point
     
     def set_sub_point(self):
+        
         self.set_linear_point()
         self.sub_point =  self.window[-1] - self.linear_point
-
+        
     def set_correlation(self):
+        start = time.time()
         self.correlation,_ = pearsonr(self.window, (self.lin_model))
+        end=time.time()
+        self.ttime += (end-start)
         
     def get_correlation(self):
         return self.correlation
@@ -162,13 +167,17 @@ class Radar_Resp_LMS():
             self.set_sub_point()
         
     def set_linear(self):
-        dur = len(self.window)
-        x = np.linspace(0, dur/30, dur)
+        
+        # dur = len(self.window)
+        x = np.linspace(0, self.win_size/30, self.win_size)
         self.intercept = self.linear_point
+        
         self.slope, intercept, r, p, std_err = stats.linregress(x, self.window)
+        
         if self.intercept == 0:
             self.intercept = intercept
         self.lin_model = self.slope * x + self.intercept
+        
         
     def set_linear_point(self):
         if self.sample_n == self.win_size:
@@ -194,7 +203,7 @@ class Radar_Resp_LMS():
         try:
             while self.running:
                 print(f"{self.sub_point} Linear subtracted point")
-                time.sleep(1/30000)
+                # time.sleep(1/30000)
         except:
             self.running = False # Stop the thread if interrupted by keyboard (e.g., in Jupyter)
 
@@ -239,49 +248,67 @@ rr_lms = Radar_Resp_LMS()
 rr_lnpi = Radar_Resp_NPI()
 rr_npi = Radar_Resp_NPI()
 rr_dnpi = Radar_Resp_NPI()
+
+start=time.time()
+sig = sig[:300]
 for val in sig:
     rr_lms.add_data(val)
     lms_sig.append(rr_lms.get_sub_point())
+end=time.time()    
+print(end-start)
+print(rr_lms.ttime)
+# start=time.time()
+# for val in sig:
+#     rr_npi.add_data(val)
+#     npi_sig.append(rr_npi.get_sub_point())
+# end=time.time()    
+# print(end-start)
+
+# start=time.time()
+# for val in sig:
+#     rr_lnpi.add_data(rr_lms.get_sub_point())
+#     lms_npi_sig.append(rr_lnpi.get_sub_point())
+# end=time.time()    
+# print(end-start)
+
+# start=time.time()
+# for val in sig:
+#     rr_dnpi.add_data(rr_npi.get_sub_point())
+#     dnpi_sig.append(rr_dnpi.get_sub_point())
+# end=time.time()    
+# print(end-start)
     
-    rr_npi.add_data(val)
-    npi_sig.append(rr_npi.get_sub_point())
-    
-    rr_lnpi.add_data(rr_lms.get_sub_point())
-    lms_npi_sig.append(rr_lnpi.get_sub_point())
-    
-    rr_dnpi.add_data(rr_npi.get_sub_point())
-    dnpi_sig.append(rr_dnpi.get_sub_point())
 #     npi_mod.append(rr_lms.get_model_point())
 # all_peaks = rr_lms.get_all_peaks()
 # used_peaks = rr_lms.get_npeaks()
 
 #%% Plotting
-time_axis = np.arange(len(sig)) / 30  # Time in seconds
+# time_axis = np.arange(len(sig)) / 30  # Time in seconds
 
-# Create subplots
-fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
-fig.suptitle(title, fontsize=20, fontweight='bold')
+# # Create subplots
+# fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)  # 2 rows, 1 column
+# fig.suptitle(title, fontsize=20, fontweight='bold')
 
-axes[0].set_title('Radar', fontsize=16)
-axes[0].set_ylabel('Displacement')
-# axes[0].plot(time_axis,sig, label='raw displacement', color='grey', linewidth=1)
-# axes[0].scatter([time_axis[idx] for idx in all_peaks],[sig[idx] for idx in all_peaks], label='negative peaks', color='green')
-# axes[0].scatter([time_axis[idx] for idx in used_peaks],[sig[idx] for idx in used_peaks], label='used negative peaks', color='orange')
-# axes[0].plot(time_axis,npi_mod, label='npi model', color='orange', linewidth=1)
-axes[0].plot(time_axis,npi_sig, label='displacement npi', color='blue', linewidth=1)
-axes[0].plot(time_axis,lms_sig, label='displacement lms', color='red', linewidth=1)
-axes[0].plot(time_axis,lms_npi_sig, label='displacement lms>npi', color='purple', linewidth=1)
-axes[0].plot(time_axis,dnpi_sig, label='displacement npi>npi', color='magenta', linewidth=1)
+# axes[0].set_title('Radar', fontsize=16)
+# axes[0].set_ylabel('Displacement')
+# # axes[0].plot(time_axis,sig, label='raw displacement', color='grey', linewidth=1)
+# # axes[0].scatter([time_axis[idx] for idx in all_peaks],[sig[idx] for idx in all_peaks], label='negative peaks', color='green')
+# # axes[0].scatter([time_axis[idx] for idx in used_peaks],[sig[idx] for idx in used_peaks], label='used negative peaks', color='orange')
+# # axes[0].plot(time_axis,npi_mod, label='npi model', color='orange', linewidth=1)
+# # axes[0].plot(time_axis,npi_sig, label='displacement npi', color='blue', linewidth=1)
+# axes[0].plot(time_axis,lms_sig, label='displacement lms', color='red', linewidth=1)
+# # axes[0].plot(time_axis,lms_npi_sig, label='displacement lms>npi', color='purple', linewidth=1)
+# # axes[0].plot(time_axis,dnpi_sig, label='displacement npi>npi', color='magenta', linewidth=1)
 
-axes[0].grid()
-axes[0].legend(loc='upper right')
+# axes[0].grid()
+# axes[0].legend(loc='upper right')
     
-axes[1].set_title('Pneum', fontsize=16)
-axes[1].set_ylabel('Displacement')
-axes[1].plot(time_axis,truth, label='pneum', color='black', linewidth=3)
-axes[1].set_xlabel('Time (s)')
-axes[1].grid()
-axes[1].legend(loc='upper right')
+# axes[1].set_title('Pneum', fontsize=16)
+# axes[1].set_ylabel('Displacement')
+# axes[1].plot(time_axis,truth, label='pneum', color='black', linewidth=3)
+# axes[1].set_xlabel('Time (s)')
+# axes[1].grid()
+# axes[1].legend(loc='upper right')
 
 
 
